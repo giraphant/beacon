@@ -62,9 +62,10 @@ function fetchWithTimeout(url: string, timeoutMs: number): Promise<Response> {
 }
 
 function getHttpsProxyArgs(scutilOutput: string): string[] {
+  const enabled = scutilOutput.match(/HTTPSEnable\s*:\s*1/);
   const proxy = scutilOutput.match(/HTTPSProxy\s*:\s*([^\n]+)/)?.[1]?.trim();
   const port = scutilOutput.match(/HTTPSPort\s*:\s*(\d+)/)?.[1]?.trim();
-  if (!proxy || !port) {
+  if (!enabled || !proxy || !port) {
     return [];
   }
   return ["--proxy", `http://${proxy}:${port}`];

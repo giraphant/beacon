@@ -41,6 +41,7 @@ describe("fetchJsonWithRetry", () => {
       },
       scutilRunner: async () => `
 <dictionary> {
+  HTTPSEnable : 1
   HTTPSProxy : 127.0.0.1
   HTTPSPort : 6152
 }
@@ -58,5 +59,56 @@ describe("fetchJsonWithRetry", () => {
         proxyArgs: ["--proxy", "http://127.0.0.1:6152"],
       },
     ]);
+  });
+
+  it("ignores stale HTTPS proxy host/port when HTTPSEnable is disabled", async () => {
+    const curlCalls: Array<{ url: string; timeoutMs: number; proxyArgs: string[] }> = [];
+
+    await fetchJsonWithRetry("https://example.com/ticker", {
+      attempts: 1,
+      useCurl: true,
+      fetcher: async () => {
+        throw new Error("fetch failed");
+      },
+      scutilRunner: async () => `
+<dictionary> {
+  HTTPSEnable : 0
+  HTTPSProxy : 127.0.0.1
+  HTTPSPort : 6152
+}
+`,
+      curlRunner: async (url, timeoutMs, proxyArgs) => {
+        curlCalls.push({ url, timeoutMs, proxyArgs });
+        return { status: 200, body: '{"ok":true}' };
+      },
+    });
+
+    expect(curlCalls).toEqual([
+      {
+        url: "https://example.com/ticker",
+        timeoutMs: 4500,
+        proxyArgs: [],
+      },
+    ]);
+  });
+
+  it("does not invoke curlRunner after fetch failure when useCurl is omitted", async () => {
+    const curlCalls: Array<{ url: string; timeoutMs: number; proxyArgs: string[] }> = [];
+
+    await expect(
+      fetchJsonWithRetry("https://example.com/ticker", {
+        attempts: 1,
+        fetcher: async () => {
+          throw new Error("fetch failed");
+        },
+        curlRunner: async (url, timeoutMs, proxyArgs) => {
+          curlCalls.push({ url, timeoutMs, proxyArgs });
+          return { status: 200, body: '{"ok":true}' };
+        },
+        scutilRunner: async () => "",
+      })
+    ).rejects.toThrow("fetch failed");
+
+    expect(curlCalls).toEqual([]);
   });
 });
