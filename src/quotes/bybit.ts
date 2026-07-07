@@ -18,7 +18,7 @@ type BybitTickersResponse = {
 };
 
 export async function fetchBybitLinearQuotes(symbols: string[]): Promise<Record<string, Quote>> {
-  const data = await fetchJsonWithRetry<BybitTickersResponse>(LINEAR_TICKER_URL, { attempts: 1, timeoutMs: 8000 });
+  const data = await fetchJsonWithRetry<BybitTickersResponse>(LINEAR_TICKER_URL, { attempts: 1, timeoutMs: 8000, useCurl: true });
   if (data.retCode !== 0) {
     throw new Error(data.retMsg || `Bybit returned retCode ${data.retCode}`);
   }
