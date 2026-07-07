@@ -26,3 +26,19 @@ export type ParsedAlertRules = {
   rules: AlertRule[];
   invalidTokens: string[];
 };
+
+export type AlertNotification = {
+  symbol: string;
+  title: string;
+  message: string;
+  movementPercent: number;
+  thresholdPercent: number;
+  crossedSteps: number;
+  currentPrice: number;
+  baselinePrice: number;
+};
+
+export type AlertEvaluation =
+  | { kind: "initialize"; nextState: AlertState }
+  | { kind: "none" }
+  | { kind: "trigger"; notification: AlertNotification; nextState: AlertState };
