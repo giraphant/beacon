@@ -26,8 +26,11 @@ export function buildMenuBarModel(input: BuildMenuBarModelInput): MenuBarModel {
   const items = displayQuotes.map((quote) => ({ title: `${quote.symbol}: ${formatPrice(quote.price)}` }));
   const sections: MenuSectionModel[] = [];
 
+  const sourceLine = buildSourceLine(displayQuotes);
+
   if (input.quoteResult) {
     const statusItems = [
+      sourceLine ? { title: sourceLine } : undefined,
       input.quoteResult.updatedAt ? { title: `Updated: ${formatAge(input.quoteResult.updatedAt, input.now)}` } : undefined,
       input.quoteResult.missingSymbols.length > 0 ? { title: `Not found: ${input.quoteResult.missingSymbols.join(", ")}` } : undefined,
       input.quoteResult.errors.length > 0 ? { title: `Refresh issues: ${input.quoteResult.errors.join("; ")}` } : undefined,
@@ -56,4 +59,12 @@ function buildTitle(displaySymbols: string[], displayQuotes: Quote[], isLoading:
     return isLoading ? "Loading..." : "No prices found";
   }
   return displayQuotes.map((quote) => `${quote.symbol} ${formatPrice(quote.price)}`).join(" · ");
+}
+
+function buildSourceLine(displayQuotes: Quote[]): string | undefined {
+  if (displayQuotes.length === 0) {
+    return undefined;
+  }
+  const uniqueSources = Array.from(new Set(displayQuotes.map((quote) => quote.source)));
+  return `Source: ${uniqueSources.join(", ")}`;
 }
