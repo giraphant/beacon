@@ -10,13 +10,13 @@
 type ExtensionPreferences = {
   /** Coins - Symbols to watch; use | to keep later symbols in the dropdown only */
   "coins": string,
-  /** Hide Menu Bar Symbols - Show only prices in the menu bar title while keeping symbols in the dropdown */
+  /** Menu Bar Symbols - Keep symbols visible in the dropdown */
   "hideMenuBarSymbols": boolean,
-  /** Hide Currency Symbol - Show prices without the currency symbol */
+  /** Currency Symbol - Show prices without $ in the menu bar and dropdown */
   "hideCurrencySymbol": boolean,
-  /** Preferred Source - Source to try first before falling back to the other source */
+  /** Preferred Source - Preferred source; Beacon falls back to the other source when needed */
   "source": "Bybit" | "Binance",
-  /** Alert Rules - Recurring alert rules such as BTC:2 NVDA:1.5 SOL:1 */
+  /** Alert Rules - Looping percent alerts. Format: SYMBOL:PERCENT, for example BTC:1 means alert every 1% move from the last alert price. */
   "alertRules": string
 }
 

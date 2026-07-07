@@ -28,17 +28,19 @@
       "required": false
     },
     {
-      "title": "Hide Menu Bar Symbols",
+      "title": "Menu Bar Symbols",
       "name": "hideMenuBarSymbols",
-      "description": "Show only prices in the menu bar title while keeping symbols in the dropdown",
+      "label": "Hide symbols in menu bar title",
+      "description": "Keep symbols visible in the dropdown",
       "type": "checkbox",
       "default": false,
       "required": false
     },
     {
-      "title": "Hide Currency Symbol",
+      "title": "Currency Symbol",
       "name": "hideCurrencySymbol",
-      "description": "Show prices without the currency symbol",
+      "label": "Hide currency symbol",
+      "description": "Show prices without $ in the menu bar and dropdown",
       "type": "checkbox",
       "default": false,
       "required": false
@@ -46,17 +48,17 @@
     {
       "name": "source",
       "title": "Preferred Source",
-      "description": "Source to try first before falling back to the other source",
+      "description": "Preferred source; Beacon falls back to the other source when needed",
       "type": "dropdown",
       "required": false,
       "default": "Bybit",
       "data": [
         {
-          "title": "Bybit first",
+          "title": "Bybit",
           "value": "Bybit"
         },
         {
-          "title": "Binance first",
+          "title": "Binance",
           "value": "Binance"
         }
       ]
@@ -64,9 +66,9 @@
     {
       "title": "Alert Rules",
       "name": "alertRules",
-      "description": "Recurring alert rules such as BTC:2 NVDA:1.5 SOL:1",
+      "description": "Looping percent alerts. Format: SYMBOL:PERCENT, for example BTC:1 means alert every 1% move from the last alert price.",
       "type": "textfield",
-      "placeholder": "BTC:2 NVDA:1.5 SOL:1",
+      "placeholder": "BTC:1 SOL:2 HYPE:3",
       "default": "",
       "required": false
     }
