@@ -56,4 +56,29 @@ describe("evaluateAlert", () => {
   it("ignores disabled rules", () => {
     expect(evaluateAlert({ ...rule, enabled: false }, quote(103), state(100), 10_000)).toEqual({ kind: "none" });
   });
+
+  it("does nothing when quote symbol differs from rule symbol", () => {
+    const ethQuote: Quote = { ...quote(101), symbol: "ETH" };
+    expect(evaluateAlert(rule, ethQuote, state(100), 10_000)).toEqual({ kind: "none" });
+    expect(evaluateAlert(rule, ethQuote, undefined, 10_000)).toEqual({ kind: "none" });
+  });
+
+  it("does nothing when current quote price is not positive", () => {
+    expect(evaluateAlert(rule, quote(0), state(100), 10_000)).toEqual({ kind: "none" });
+    expect(evaluateAlert(rule, quote(-5), state(100), 10_000)).toEqual({ kind: "none" });
+    expect(evaluateAlert(rule, quote(0), undefined, 10_000)).toEqual({ kind: "none" });
+  });
+
+  it("re-initializes when existing baseline is not positive and current price is valid", () => {
+    const result = evaluateAlert(rule, quote(100), state(0), 10_000);
+    expect(result).toEqual({
+      kind: "initialize",
+      nextState: { symbol: "BTC", lastBaselinePrice: 100 },
+    });
+  });
+
+  it("does not divide by zero when baseline is zero and price is invalid", () => {
+    const result = evaluateAlert(rule, quote(0), state(0), 10_000) as { kind: string };
+    expect(result.kind).toBe("none");
+  });
 });

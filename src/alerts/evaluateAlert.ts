@@ -11,7 +11,15 @@ export function evaluateAlert(
     return { kind: "none" };
   }
 
-  if (!state) {
+  if (quote.symbol !== rule.symbol) {
+    return { kind: "none" };
+  }
+
+  if (quote.price <= 0) {
+    return { kind: "none" };
+  }
+
+  if (!state || state.lastBaselinePrice <= 0) {
     return {
       kind: "initialize",
       nextState: {
