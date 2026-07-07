@@ -12,6 +12,8 @@ export type MenuBarModel = {
 
 export type BuildMenuBarModelInput = {
   displaySymbols: string[];
+  titleSymbols?: string[];
+  hideTitleSymbols?: boolean;
   quoteResult: QuoteFetchResult | undefined;
   invalidRuleTokens: string[];
   isLoading: boolean;
@@ -21,8 +23,10 @@ export type BuildMenuBarModelInput = {
 export function buildMenuBarModel(input: BuildMenuBarModelInput): MenuBarModel {
   const quotes = input.quoteResult?.quotes ?? {};
   const displayQuotes = input.displaySymbols.map((symbol) => quotes[symbol]).filter((quote): quote is Quote => Boolean(quote));
+  const titleSymbols = input.titleSymbols ?? input.displaySymbols;
+  const titleQuotes = titleSymbols.map((symbol) => quotes[symbol]).filter((quote): quote is Quote => Boolean(quote));
 
-  const title = buildTitle(input.displaySymbols, displayQuotes, input.isLoading);
+  const title = buildTitle(titleSymbols, titleQuotes, input.isLoading, input.hideTitleSymbols ?? false);
   const items = displayQuotes.map((quote) => ({ title: `${quote.symbol}: ${formatPrice(quote.price)}` }));
   const sections: MenuSectionModel[] = [];
 
@@ -51,14 +55,14 @@ export function buildMenuBarModel(input: BuildMenuBarModelInput): MenuBarModel {
   return { title, items, sections };
 }
 
-function buildTitle(displaySymbols: string[], displayQuotes: Quote[], isLoading: boolean) {
-  if (displaySymbols.length === 0) {
+function buildTitle(titleSymbols: string[], titleQuotes: Quote[], isLoading: boolean, hideTitleSymbols: boolean) {
+  if (titleSymbols.length === 0) {
     return "No symbols";
   }
-  if (displayQuotes.length === 0) {
+  if (titleQuotes.length === 0) {
     return isLoading ? "Loading..." : "No prices found";
   }
-  return displayQuotes.map((quote) => `${quote.symbol} ${formatPrice(quote.price)}`).join(" · ");
+  return titleQuotes.map((quote) => (hideTitleSymbols ? formatPrice(quote.price) : `${quote.symbol} ${formatPrice(quote.price)}`)).join(" · ");
 }
 
 function buildSourceLine(displayQuotes: Quote[]): string | undefined {

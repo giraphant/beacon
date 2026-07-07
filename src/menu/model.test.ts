@@ -7,6 +7,7 @@ describe("buildMenuBarModel", () => {
   it("builds a compact title from display symbols only", () => {
     const model = buildMenuBarModel({
       displaySymbols: ["BTC", "ETH"],
+      titleSymbols: ["BTC", "ETH"],
       quoteResult: { quotes: { BTC: quote("BTC", 100), ETH: quote("ETH", 200), SOL: quote("SOL", 50) }, missingSymbols: [], errors: [], updatedAt: 1_000 },
       invalidRuleTokens: [],
       isLoading: false,
@@ -86,4 +87,38 @@ describe("buildMenuBarModel", () => {
 
     expect(model.title).toBe("No symbols");
   });
+});
+
+
+it("shows dropdown rows for quote symbols that are hidden from the menu bar title by pipe", () => {
+  const model = buildMenuBarModel({
+    displaySymbols: ["BTC", "ETH", "NVDA", "QQQ"],
+    titleSymbols: ["BTC", "ETH"],
+    quoteResult: {
+      quotes: { BTC: quote("BTC", 100), ETH: quote("ETH", 200), NVDA: quote("NVDA", 300), QQQ: quote("QQQ", 400) },
+      missingSymbols: [],
+      errors: [],
+      updatedAt: 1_000,
+    },
+    invalidRuleTokens: [],
+    isLoading: false,
+    now: 12_000,
+  });
+
+  expect(model.title).toBe("BTC $100.00 · ETH $200.00");
+  expect(model.items.map((item) => item.title)).toEqual(["BTC: $100.00", "ETH: $200.00", "NVDA: $300.00", "QQQ: $400.00"]);
+});
+
+it("can hide symbols in the menu bar title while preserving dropdown row symbols", () => {
+  const model = buildMenuBarModel({
+    displaySymbols: ["BTC", "ETH"],
+    hideTitleSymbols: true,
+    quoteResult: { quotes: { BTC: quote("BTC", 100), ETH: quote("ETH", 200) }, missingSymbols: [], errors: [], updatedAt: 1_000 },
+    invalidRuleTokens: [],
+    isLoading: false,
+    now: 12_000,
+  });
+
+  expect(model.title).toBe("$100.00 · $200.00");
+  expect(model.items.map((item) => item.title)).toEqual(["BTC: $100.00", "ETH: $200.00"]);
 });

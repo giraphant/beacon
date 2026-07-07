@@ -4,19 +4,19 @@ const SYMBOL_SPLIT_PATTERN = /[\s,|]+/;
 const RULE_PATTERN = /^([A-Za-z0-9._-]+):(\d+(?:\.\d+)?)$/;
 
 export function parseSymbolsText(text: string): string[] {
-  const seen = new Set<string>();
-  const symbols: string[] = [];
+  return parseSymbolTokens(text);
+}
 
-  for (const rawToken of text.split(SYMBOL_SPLIT_PATTERN)) {
-    const symbol = normalizeSymbol(rawToken);
-    if (!symbol || seen.has(symbol)) {
-      continue;
-    }
-    seen.add(symbol);
-    symbols.push(symbol);
+export function parseCoinDisplayText(text: string): { titleSymbols: string[]; quoteSymbols: string[] } {
+  const pipeIndex = text.indexOf("|");
+  if (pipeIndex === -1) {
+    const symbols = parseSymbolTokens(text);
+    return { titleSymbols: symbols, quoteSymbols: symbols };
   }
 
-  return symbols;
+  const titleSymbols = parseSymbolTokens(text.slice(0, pipeIndex));
+  const dropdownOnlySymbols = parseSymbolTokens(text.slice(pipeIndex + 1));
+  return { titleSymbols, quoteSymbols: dedupeSymbols([...titleSymbols, ...dropdownOnlySymbols]) };
 }
 
 export function parseAlertRulesText(text: string): ParsedAlertRules {
@@ -49,6 +49,25 @@ export function parseAlertRulesText(text: string): ParsedAlertRules {
   }
 
   return { rules: [...rulesBySymbol.values()], invalidTokens };
+}
+
+function parseSymbolTokens(text: string): string[] {
+  return dedupeSymbols(text.split(SYMBOL_SPLIT_PATTERN).map(normalizeSymbol));
+}
+
+function dedupeSymbols(values: string[]): string[] {
+  const seen = new Set<string>();
+  const symbols: string[] = [];
+
+  for (const symbol of values) {
+    if (!symbol || seen.has(symbol)) {
+      continue;
+    }
+    seen.add(symbol);
+    symbols.push(symbol);
+  }
+
+  return symbols;
 }
 
 function normalizeSymbol(value: string) {

@@ -15,11 +15,11 @@ export function evaluateAlert(
     return { kind: "none" };
   }
 
-  if (quote.price <= 0) {
+  if (!Number.isFinite(quote.price) || quote.price <= 0) {
     return { kind: "none" };
   }
 
-  if (!state || state.lastBaselinePrice <= 0) {
+  if (!state || !Number.isFinite(state.lastBaselinePrice) || state.lastBaselinePrice <= 0) {
     return {
       kind: "initialize",
       nextState: {

@@ -1,26 +1,30 @@
 import { MenuBarExtra, getPreferenceValues, openCommandPreferences } from "@raycast/api";
 import { useCachedState, usePromise } from "@raycast/utils";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { getAlertState, saveAlertState } from "#/alerts/raycastState";
 import { notifyAlert } from "#/alerts/raycastNotifier";
 import { runAlerts } from "#/alerts/runAlerts";
-import { parseAlertRulesText, parseSymbolsText } from "#/config/preferences";
+import { parseAlertRulesText, parseCoinDisplayText } from "#/config/preferences";
 import { buildMenuBarModel } from "#/menu/model";
 import { fetchQuotesWithFallback, type QuoteFetchResult } from "#/quotes/fallback";
 
 type MenuBarPreferences = {
   coins?: string;
   alertRules?: string;
+  hideMenuBarSymbols?: boolean;
 };
 
 export default function Command() {
   const preferences = getPreferenceValues<MenuBarPreferences>();
-  const displaySymbols = useMemo(() => parseSymbolsText(preferences.coins ?? ""), [preferences.coins]);
+  const coinDisplay = useMemo(() => parseCoinDisplayText(preferences.coins ?? ""), [preferences.coins]);
+  const displaySymbols = coinDisplay.quoteSymbols;
+  const titleSymbols = coinDisplay.titleSymbols;
   const parsedRules = useMemo(() => parseAlertRulesText(preferences.alertRules ?? ""), [preferences.alertRules]);
   const quoteSymbols = useMemo(
     () => [...new Set([...displaySymbols, ...parsedRules.rules.map((rule) => rule.symbol)])],
     [displaySymbols, parsedRules.rules]
   );
+  const alertRunInFlight = useRef(false);
 
   const [cachedQuotes, setCachedQuotes] = useCachedState<QuoteFetchResult | undefined>("quote-cache", undefined);
   const { data, isLoading, error } = usePromise(fetchQuotesWithFallback, [quoteSymbols], {
@@ -32,22 +36,29 @@ export default function Command() {
   const quoteResult = data ?? cachedQuotes;
 
   useEffect(() => {
-    if (!quoteResult || parsedRules.rules.length === 0) {
+    if (!data || parsedRules.rules.length === 0 || alertRunInFlight.current) {
       return;
     }
 
-    runAlerts({
+    alertRunInFlight.current = true;
+    void runAlerts({
       rules: parsedRules.rules,
-      quotes: quoteResult.quotes,
+      quotes: data.quotes,
       now: Date.now(),
       getState: getAlertState,
       saveState: saveAlertState,
       notify: notifyAlert,
-    });
-  }, [quoteResult?.updatedAt, parsedRules.rules]);
+    })
+      .catch(() => undefined)
+      .finally(() => {
+        alertRunInFlight.current = false;
+      });
+  }, [data?.updatedAt, parsedRules.rules]);
 
   const model = buildMenuBarModel({
     displaySymbols,
+    titleSymbols,
+    hideTitleSymbols: preferences.hideMenuBarSymbols ?? false,
     quoteResult: error && cachedQuotes ? { ...cachedQuotes, errors: [error.message] } : quoteResult,
     invalidRuleTokens: parsedRules.invalidTokens,
     isLoading,

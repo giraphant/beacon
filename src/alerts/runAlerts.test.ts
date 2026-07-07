@@ -78,3 +78,48 @@ describe("runAlerts", () => {
     expect(result).toEqual({ initialized: 0, triggered: 0, skipped: 1, failed: 0 });
   });
 });
+
+
+it("uses rule identity when loading and saving state", async () => {
+  const requested: string[] = [];
+  const saved: Array<{ state: AlertState; thresholdPercent: number }> = [];
+
+  await runAlerts({
+    rules: [rule("BTC", 2)],
+    quotes: { BTC: quote("BTC", 100) },
+    now: 10_000,
+    getState: async (symbol, thresholdPercent) => {
+      requested.push(`${symbol}:${thresholdPercent}`);
+      return undefined;
+    },
+    saveState: async (state, thresholdPercent) => {
+      saved.push({ state, thresholdPercent });
+    },
+    notify: async () => undefined,
+  });
+
+  expect(requested).toEqual(["BTC:2"]);
+  expect(saved).toEqual([{ state: { symbol: "BTC", lastBaselinePrice: 100 }, thresholdPercent: 2 }]);
+});
+
+it("continues evaluating later rules when state load or initialization save fails", async () => {
+  const saved: AlertState[] = [];
+
+  const result = await runAlerts({
+    rules: [rule("BTC", 1), rule("ETH", 1), rule("SOL", 1)],
+    quotes: { BTC: quote("BTC", 100), ETH: quote("ETH", 200), SOL: quote("SOL", 300) },
+    now: 10_000,
+    getState: async (symbol) => {
+      if (symbol === "BTC") throw new Error("load failed");
+      return undefined;
+    },
+    saveState: async (state) => {
+      if (state.symbol === "ETH") throw new Error("save failed");
+      saved.push(state);
+    },
+    notify: async () => undefined,
+  });
+
+  expect(result).toEqual({ initialized: 1, triggered: 0, skipped: 0, failed: 2 });
+  expect(saved).toEqual([{ symbol: "SOL", lastBaselinePrice: 300 }]);
+});

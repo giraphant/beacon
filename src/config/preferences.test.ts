@@ -1,4 +1,4 @@
-import { parseAlertRulesText, parseSymbolsText } from "./preferences";
+import { parseAlertRulesText, parseSymbolsText, parseCoinDisplayText } from "./preferences";
 
 describe("parseSymbolsText", () => {
   it("normalizes space, comma, and vertical-bar separated symbols", () => {
@@ -39,6 +39,23 @@ describe("parseAlertRulesText", () => {
         { symbol: "BTC", thresholdPercent: 3, enabled: true },
       ],
       invalidTokens: [],
+    });
+  });
+});
+
+
+describe("parseCoinDisplayText", () => {
+  it("splits title symbols before the pipe from dropdown quote symbols", () => {
+    expect(parseCoinDisplayText("BTC ETH | NVDA QQQ")).toEqual({
+      titleSymbols: ["BTC", "ETH"],
+      quoteSymbols: ["BTC", "ETH", "NVDA", "QQQ"],
+    });
+  });
+
+  it("uses all configured symbols in the title when no pipe is present", () => {
+    expect(parseCoinDisplayText("btc, eth nvda")).toEqual({
+      titleSymbols: ["BTC", "ETH", "NVDA"],
+      quoteSymbols: ["BTC", "ETH", "NVDA"],
     });
   });
 });

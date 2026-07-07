@@ -25,19 +25,29 @@ export async function fetchBinanceSpotQuotes(symbols: string[]): Promise<Record<
     if (!isBinanceTicker(item) || !targetSymbols.has(item.symbol)) {
       continue;
     }
+    const price = Number(item.lastPrice);
+    const high24h = Number(item.highPrice);
+    const low24h = Number(item.lowPrice);
+    if (!isPositiveFinite(price) || !isPositiveFinite(high24h) || !isPositiveFinite(low24h)) {
+      continue;
+    }
     const symbol = item.symbol.replace(/USDT$/, "");
     quotes[symbol] = {
       symbol,
       name: getInstrumentName(symbol),
-      price: Number(item.lastPrice),
-      high24h: Number(item.highPrice),
-      low24h: Number(item.lowPrice),
+      price,
+      high24h,
+      low24h,
       source: "Binance spot (USDT)",
       updatedAt,
     };
   }
 
   return quotes;
+}
+
+function isPositiveFinite(value: number) {
+  return Number.isFinite(value) && value > 0;
 }
 
 function isBinanceTicker(value: unknown): value is BinanceTicker {

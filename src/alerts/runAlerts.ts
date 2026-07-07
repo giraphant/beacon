@@ -5,8 +5,8 @@ export type RunAlertsInput = {
   rules: AlertRule[];
   quotes: Record<string, Quote>;
   now: number;
-  getState: (symbol: string) => Promise<AlertState | undefined>;
-  saveState: (state: AlertState) => Promise<void>;
+  getState: (symbol: string, thresholdPercent: number) => Promise<AlertState | undefined>;
+  saveState: (state: AlertState, thresholdPercent: number) => Promise<void>;
   notify: (notification: AlertNotification) => Promise<void>;
 };
 
@@ -27,7 +27,14 @@ export async function runAlerts(input: RunAlertsInput): Promise<RunAlertsResult>
       continue;
     }
 
-    const state = await input.getState(rule.symbol);
+    let state: AlertState | undefined;
+    try {
+      state = await input.getState(rule.symbol, rule.thresholdPercent);
+    } catch {
+      result.failed += 1;
+      continue;
+    }
+
     const evaluation = evaluateAlert(rule, quote, state, input.now);
 
     if (evaluation.kind === "none") {
@@ -35,14 +42,18 @@ export async function runAlerts(input: RunAlertsInput): Promise<RunAlertsResult>
     }
 
     if (evaluation.kind === "initialize") {
-      await input.saveState(evaluation.nextState);
-      result.initialized += 1;
+      try {
+        await input.saveState(evaluation.nextState, rule.thresholdPercent);
+        result.initialized += 1;
+      } catch {
+        result.failed += 1;
+      }
       continue;
     }
 
     try {
       await input.notify(evaluation.notification);
-      await input.saveState(evaluation.nextState);
+      await input.saveState(evaluation.nextState, rule.thresholdPercent);
       result.triggered += 1;
     } catch {
       result.failed += 1;

@@ -3,19 +3,37 @@ import type { AlertState } from "#/types";
 
 const STORAGE_PREFIX = "alert-state:";
 
-export async function getAlertState(symbol: string): Promise<AlertState | undefined> {
-  const value = await LocalStorage.getItem<string>(`${STORAGE_PREFIX}${symbol}`);
+export async function getAlertState(symbol: string, thresholdPercent: number): Promise<AlertState | undefined> {
+  const value = await LocalStorage.getItem<string>(stateKey(symbol, thresholdPercent));
   if (!value) {
     return undefined;
   }
 
   try {
-    return JSON.parse(value) as AlertState;
+    const parsed = JSON.parse(value);
+    return isAlertState(parsed, symbol) ? parsed : undefined;
   } catch {
     return undefined;
   }
 }
 
-export async function saveAlertState(state: AlertState): Promise<void> {
-  await LocalStorage.setItem(`${STORAGE_PREFIX}${state.symbol}`, JSON.stringify(state));
+export async function saveAlertState(state: AlertState, thresholdPercent: number): Promise<void> {
+  await LocalStorage.setItem(stateKey(state.symbol, thresholdPercent), JSON.stringify(state));
+}
+
+function stateKey(symbol: string, thresholdPercent: number) {
+  return `${STORAGE_PREFIX}${symbol}:${thresholdPercent}`;
+}
+
+function isAlertState(value: unknown, symbol: string): value is AlertState {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const state = value as Record<string, unknown>;
+  return (
+    state.symbol === symbol &&
+    Number.isFinite(state.lastBaselinePrice) &&
+    (state.lastTriggeredAt === undefined || Number.isFinite(state.lastTriggeredAt)) &&
+    (state.lastTriggeredPrice === undefined || Number.isFinite(state.lastTriggeredPrice))
+  );
 }

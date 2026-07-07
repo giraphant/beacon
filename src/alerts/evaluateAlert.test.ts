@@ -82,3 +82,16 @@ describe("evaluateAlert", () => {
     expect(result.kind).toBe("none");
   });
 });
+
+
+it("does nothing for non-finite current prices", () => {
+  expect(evaluateAlert(rule, quote(Number.NaN), state(100), 10_000)).toEqual({ kind: "none" });
+  expect(evaluateAlert(rule, quote(Number.POSITIVE_INFINITY), state(100), 10_000)).toEqual({ kind: "none" });
+});
+
+it("does not use non-finite baselines", () => {
+  expect(evaluateAlert(rule, quote(100), state(Number.NaN), 10_000)).toEqual({
+    kind: "initialize",
+    nextState: { symbol: "BTC", lastBaselinePrice: 100 },
+  });
+});

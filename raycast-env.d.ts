@@ -10,6 +10,8 @@
 type ExtensionPreferences = {
   /** Coins - Symbols to show in the menu bar, separated by spaces, commas, or vertical bars */
   "coins": string,
+  /** Hide Menu Bar Symbols - Show only prices in the menu bar title while keeping symbols in the dropdown */
+  "hideMenuBarSymbols": boolean,
   /** Alert Rules - Recurring alert rules such as BTC:2 NVDA:1.5 SOL:1 */
   "alertRules": string
 }

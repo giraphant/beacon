@@ -33,19 +33,29 @@ export async function fetchBybitLinearQuotes(symbols: string[]): Promise<Record<
     if (!isBybitTicker(item) || !targetSymbols.has(item.symbol)) {
       continue;
     }
+    const price = Number(item.lastPrice);
+    const high24h = Number(item.highPrice24h);
+    const low24h = Number(item.lowPrice24h);
+    if (!isPositiveFinite(price) || !isPositiveFinite(high24h) || !isPositiveFinite(low24h)) {
+      continue;
+    }
     const symbol = item.symbol.replace(/USDT$/, "");
     quotes[symbol] = {
       symbol,
       name: getInstrumentName(symbol),
-      price: Number(item.lastPrice),
-      high24h: Number(item.highPrice24h),
-      low24h: Number(item.lowPrice24h),
+      price,
+      high24h,
+      low24h,
       source: "Bybit linear (USDT)",
       updatedAt,
     };
   }
 
   return quotes;
+}
+
+function isPositiveFinite(value: number) {
+  return Number.isFinite(value) && value > 0;
 }
 
 function isBybitTicker(value: unknown): value is BybitTicker {
