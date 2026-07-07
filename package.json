@@ -1,0 +1,101 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "beacon",
+  "title": "Beacon",
+  "description": "A price signal beacon for Raycast menu bar alerts",
+  "icon": "command-icon.png",
+  "author": "giraphant",
+  "owner": "giraphant",
+  "categories": ["Finance"],
+  "license": "MIT",
+  "commands": [
+    {
+      "name": "menu-bar",
+      "title": "Beacon",
+      "description": "Watch prices and receive movement alerts",
+      "mode": "menu-bar",
+      "interval": "30s"
+    }
+  ],
+  "preferences": [
+    {
+      "title": "Coins",
+      "name": "coins",
+      "description": "Symbols to watch; use | to keep later symbols in the dropdown only",
+      "type": "textfield",
+      "placeholder": "BTC ETH NVDA QQQ",
+      "default": "BTC ETH NVDA QQQ",
+      "required": false
+    },
+    {
+      "title": "Menu Bar Symbols",
+      "name": "hideMenuBarSymbols",
+      "label": "Hide symbols in menu bar title",
+      "description": "Keep symbols visible in the dropdown",
+      "type": "checkbox",
+      "default": false,
+      "required": false
+    },
+    {
+      "title": "Currency Symbol",
+      "name": "hideCurrencySymbol",
+      "label": "Hide currency symbol",
+      "description": "Show prices without $ in the menu bar and dropdown",
+      "type": "checkbox",
+      "default": false,
+      "required": false
+    },
+    {
+      "name": "source",
+      "title": "Preferred Source",
+      "description": "Preferred source; Beacon falls back to the other source when needed",
+      "type": "dropdown",
+      "required": false,
+      "default": "Bybit",
+      "data": [
+        {
+          "title": "Bybit",
+          "value": "Bybit"
+        },
+        {
+          "title": "Binance",
+          "value": "Binance"
+        }
+      ]
+    },
+    {
+      "title": "Alert Rules",
+      "name": "alertRules",
+      "description": "Looping percent alerts. Format: SYMBOL:PERCENT, for example BTC:1 means alert every 1% move from the last alert price.",
+      "type": "textfield",
+      "placeholder": "BTC:1 SOL:2 HYPE:3",
+      "default": "",
+      "required": false
+    }
+  ],
+  "dependencies": {
+    "@raycast/api": "^1.104.19",
+    "@raycast/utils": "^2.2.7"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.12",
+    "@types/node": "~16.10.0",
+    "@types/react": "^17.0.28",
+    "@typescript-eslint/eslint-plugin": "^5.0.0",
+    "@typescript-eslint/parser": "^5.0.0",
+    "eslint": "^7.32.0",
+    "eslint-config-prettier": "^8.3.0",
+    "jest": "^29.7.0",
+    "prettier": "^2.5.1",
+    "ts-jest": "^29.1.2",
+    "typescript": "^4.4.3"
+  },
+  "scripts": {
+    "test": "jest",
+    "build": "RAY_Target=x ray build -e dist",
+    "dev": "RAY_Target=x ray develop",
+    "fix-lint": "ray lint --fix",
+    "lint": "ray lint",
+    "publish": "ray publish"
+  }
+}
