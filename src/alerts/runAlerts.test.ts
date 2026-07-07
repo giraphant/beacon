@@ -14,8 +14,12 @@ describe("runAlerts", () => {
       quotes: { BTC: quote("BTC", 100) },
       now: 10_000,
       getState: async () => undefined,
-      saveState: async (state) => saved.push(state),
-      notify: async (notification) => notifications.push(notification),
+      saveState: async (state) => {
+        saved.push(state);
+      },
+      notify: async (notification) => {
+        notifications.push(notification);
+      },
     });
 
     expect(result).toEqual({ initialized: 1, triggered: 0, skipped: 0, failed: 0 });
@@ -31,7 +35,9 @@ describe("runAlerts", () => {
       quotes: { BTC: quote("BTC", 102) },
       now: 10_000,
       getState: async () => ({ symbol: "BTC", lastBaselinePrice: 100 }),
-      saveState: async (state) => saved.push(state),
+      saveState: async (state) => {
+        saved.push(state);
+      },
       notify: async () => undefined,
     });
 
@@ -47,7 +53,9 @@ describe("runAlerts", () => {
       quotes: { BTC: quote("BTC", 102) },
       now: 10_000,
       getState: async () => ({ symbol: "BTC", lastBaselinePrice: 100 }),
-      saveState: async (state) => saved.push(state),
+      saveState: async (state) => {
+        saved.push(state);
+      },
       notify: async () => {
         throw new Error("notification failed");
       },
