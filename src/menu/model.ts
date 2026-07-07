@@ -25,11 +25,13 @@ export function buildMenuBarModel(input: BuildMenuBarModelInput): MenuBarModel {
   const quotes = input.quoteResult?.quotes ?? {};
   const displayQuotes = input.displaySymbols.map((symbol) => quotes[symbol]).filter((quote): quote is Quote => Boolean(quote));
   const titleSymbols = input.titleSymbols ?? input.displaySymbols;
+  const titleSymbolSet = new Set(titleSymbols);
   const titleQuotes = titleSymbols.map((symbol) => quotes[symbol]).filter((quote): quote is Quote => Boolean(quote));
+  const dropdownQuotes = displayQuotes.filter((quote) => !titleSymbolSet.has(quote.symbol));
 
   const priceFormatOptions = { hideCurrencySymbol: input.hideCurrencySymbol ?? false };
   const title = buildTitle(titleSymbols, titleQuotes, input.isLoading, input.hideTitleSymbols ?? false, priceFormatOptions);
-  const items = displayQuotes.map((quote) => ({ title: `${quote.symbol}: ${formatPrice(quote.price, priceFormatOptions)}` }));
+  const items = dropdownQuotes.map((quote) => ({ title: `${quote.symbol}: ${formatPrice(quote.price, priceFormatOptions)}` }));
   const sections: MenuSectionModel[] = [];
 
   const sourceLine = buildSourceLine(displayQuotes);

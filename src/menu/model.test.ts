@@ -15,7 +15,7 @@ describe("buildMenuBarModel", () => {
     });
 
     expect(model.title).toBe("BTC $100.00 · ETH $200.00");
-    expect(model.items.map((item) => item.title)).toEqual(["BTC: $100.00", "ETH: $200.00"]);
+    expect(model.items.map((item) => item.title)).toEqual([]);
   });
 
   it("does not show alert rule status during normal operation", () => {
@@ -106,7 +106,7 @@ it("shows dropdown rows for quote symbols that are hidden from the menu bar titl
   });
 
   expect(model.title).toBe("BTC $100.00 · ETH $200.00");
-  expect(model.items.map((item) => item.title)).toEqual(["BTC: $100.00", "ETH: $200.00", "NVDA: $300.00", "QQQ: $400.00"]);
+  expect(model.items.map((item) => item.title)).toEqual(["NVDA: $300.00", "QQQ: $400.00"]);
 });
 
 it("can hide symbols in the menu bar title while preserving dropdown row symbols", () => {
@@ -120,7 +120,7 @@ it("can hide symbols in the menu bar title while preserving dropdown row symbols
   });
 
   expect(model.title).toBe("$100.00 · $200.00");
-  expect(model.items.map((item) => item.title)).toEqual(["BTC: $100.00", "ETH: $200.00"]);
+  expect(model.items.map((item) => item.title)).toEqual([]);
 });
 
 it("can hide currency symbols in the title and dropdown rows", () => {
@@ -134,5 +134,5 @@ it("can hide currency symbols in the title and dropdown rows", () => {
   });
 
   expect(model.title).toBe("BTC 100.00 · ETH 200.00");
-  expect(model.items.map((item) => item.title)).toEqual(["BTC: 100.00", "ETH: 200.00"]);
+  expect(model.items.map((item) => item.title)).toEqual([]);
 });
