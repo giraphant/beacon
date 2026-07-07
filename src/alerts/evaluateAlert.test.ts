@@ -49,7 +49,7 @@ describe("evaluateAlert", () => {
     const result = evaluateAlert(rule, quote(103.2), state(100), 10_000);
     expect(result.kind).toBe("trigger");
     if (result.kind !== "trigger") throw new Error("expected trigger");
-    expect(result.notification.message).toBe("$100 → $103.20, crossed 3 × 1.00% steps");
+    expect(result.notification.message).toBe("$100.00 → $103.20, crossed 3 × 1.00% steps");
     expect(result.notification.crossedSteps).toBe(3);
   });
 
