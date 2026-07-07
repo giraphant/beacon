@@ -1,6 +1,7 @@
 import { MenuBarExtra, getPreferenceValues, openCommandPreferences } from "@raycast/api";
 import { useCachedState, usePromise } from "@raycast/utils";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo } from "react";
+import { createAlertRuleSignature, createFreshQuoteAlertScheduler, createQuoteSymbolSignature } from "#/alerts/freshQuoteAlertScheduler";
 import { getAlertState, saveAlertState } from "#/alerts/raycastState";
 import { notifyAlert } from "#/alerts/raycastNotifier";
 import { runAlerts } from "#/alerts/runAlerts";
@@ -14,6 +15,24 @@ type MenuBarPreferences = {
   hideMenuBarSymbols?: boolean;
 };
 
+type TaggedQuoteFetchResult = {
+  result: QuoteFetchResult;
+  ruleSignature: string;
+  quoteSymbolSignature: string;
+};
+
+async function fetchTaggedQuotes(
+  symbols: string[],
+  ruleSignature: string,
+  quoteSymbolSignature: string
+): Promise<TaggedQuoteFetchResult> {
+  return {
+    result: await fetchQuotesWithFallback(symbols),
+    ruleSignature,
+    quoteSymbolSignature,
+  };
+}
+
 export default function Command() {
   const preferences = getPreferenceValues<MenuBarPreferences>();
   const coinDisplay = useMemo(() => parseCoinDisplayText(preferences.coins ?? ""), [preferences.coins]);
@@ -24,36 +43,48 @@ export default function Command() {
     () => [...new Set([...displaySymbols, ...parsedRules.rules.map((rule) => rule.symbol)])],
     [displaySymbols, parsedRules.rules]
   );
-  const alertRunInFlight = useRef(false);
+  const ruleSignature = useMemo(() => createAlertRuleSignature(parsedRules.rules), [parsedRules.rules]);
+  const quoteSymbolSignature = useMemo(() => createQuoteSymbolSignature(quoteSymbols), [quoteSymbols]);
+  const alertScheduler = useMemo(
+    () =>
+      createFreshQuoteAlertScheduler({
+        runAlerts: ({ rules, quotes, now }) =>
+          runAlerts({
+            rules,
+            quotes,
+            now,
+            getState: getAlertState,
+            saveState: saveAlertState,
+            notify: notifyAlert,
+          }),
+      }),
+    []
+  );
 
   const [cachedQuotes, setCachedQuotes] = useCachedState<QuoteFetchResult | undefined>("quote-cache", undefined);
-  const { data, isLoading, error } = usePromise(fetchQuotesWithFallback, [quoteSymbols], {
+  const { data, isLoading, error } = usePromise(fetchTaggedQuotes, [quoteSymbols, ruleSignature, quoteSymbolSignature], {
     execute: quoteSymbols.length > 0,
-    onData: (result) => setCachedQuotes(result),
+    onData: ({ result }) => setCachedQuotes(result),
     onError: () => undefined,
   });
 
-  const quoteResult = data ?? cachedQuotes;
+  const quoteResult = data?.result ?? cachedQuotes;
 
   useEffect(() => {
-    if (!data || parsedRules.rules.length === 0 || alertRunInFlight.current) {
+    if (!data) {
       return;
     }
 
-    alertRunInFlight.current = true;
-    void runAlerts({
+    alertScheduler.submitFreshQuoteResult({
       rules: parsedRules.rules,
-      quotes: data.quotes,
+      quotes: data.result.quotes,
+      fetchRuleSignature: data.ruleSignature,
+      currentRuleSignature: ruleSignature,
+      fetchQuoteSymbolSignature: data.quoteSymbolSignature,
+      currentQuoteSymbolSignature: quoteSymbolSignature,
       now: Date.now(),
-      getState: getAlertState,
-      saveState: saveAlertState,
-      notify: notifyAlert,
-    })
-      .catch(() => undefined)
-      .finally(() => {
-        alertRunInFlight.current = false;
-      });
-  }, [data?.updatedAt, parsedRules.rules]);
+    });
+  }, [data, alertScheduler, parsedRules.rules, ruleSignature, quoteSymbolSignature]);
 
   const model = buildMenuBarModel({
     displaySymbols,
