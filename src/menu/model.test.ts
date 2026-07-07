@@ -122,3 +122,17 @@ it("can hide symbols in the menu bar title while preserving dropdown row symbols
   expect(model.title).toBe("$100.00 · $200.00");
   expect(model.items.map((item) => item.title)).toEqual(["BTC: $100.00", "ETH: $200.00"]);
 });
+
+it("can hide currency symbols in the title and dropdown rows", () => {
+  const model = buildMenuBarModel({
+    displaySymbols: ["BTC", "ETH"],
+    hideCurrencySymbol: true,
+    quoteResult: { quotes: { BTC: quote("BTC", 100), ETH: quote("ETH", 200) }, missingSymbols: [], errors: [], updatedAt: 1_000 },
+    invalidRuleTokens: [],
+    isLoading: false,
+    now: 12_000,
+  });
+
+  expect(model.title).toBe("BTC 100.00 · ETH 200.00");
+  expect(model.items.map((item) => item.title)).toEqual(["BTC: 100.00", "ETH: 200.00"]);
+});

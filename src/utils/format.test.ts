@@ -6,6 +6,12 @@ describe("formatPrice", () => {
     expect(formatPrice(421.456)).toBe("$421.46");
     expect(formatPrice(0.123456)).toBe("$0.1235");
   });
+
+  it("can hide the currency symbol", () => {
+    expect(formatPrice(103245.18, { hideCurrencySymbol: true })).toBe("103,245");
+    expect(formatPrice(421.456, { hideCurrencySymbol: true })).toBe("421.46");
+    expect(formatPrice(0.123456, { hideCurrencySymbol: true })).toBe("0.1235");
+  });
 });
 
 describe("formatPercent", () => {

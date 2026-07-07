@@ -4,11 +4,11 @@ const PRICE_FORMATTERS = [
   { max: 1000, digits: 2 },
 ] as const;
 
-export function formatPrice(price: number): string {
+export function formatPrice(price: number, options: { hideCurrencySymbol?: boolean } = {}): string {
   const digits = PRICE_FORMATTERS.find((formatter) => Math.abs(price) < formatter.max)?.digits ?? 0;
   return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
+    style: options.hideCurrencySymbol ? "decimal" : "currency",
+    currency: options.hideCurrencySymbol ? undefined : "USD",
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   }).format(price);

@@ -14,6 +14,7 @@ export type BuildMenuBarModelInput = {
   displaySymbols: string[];
   titleSymbols?: string[];
   hideTitleSymbols?: boolean;
+  hideCurrencySymbol?: boolean;
   quoteResult: QuoteFetchResult | undefined;
   invalidRuleTokens: string[];
   isLoading: boolean;
@@ -26,8 +27,9 @@ export function buildMenuBarModel(input: BuildMenuBarModelInput): MenuBarModel {
   const titleSymbols = input.titleSymbols ?? input.displaySymbols;
   const titleQuotes = titleSymbols.map((symbol) => quotes[symbol]).filter((quote): quote is Quote => Boolean(quote));
 
-  const title = buildTitle(titleSymbols, titleQuotes, input.isLoading, input.hideTitleSymbols ?? false);
-  const items = displayQuotes.map((quote) => ({ title: `${quote.symbol}: ${formatPrice(quote.price)}` }));
+  const priceFormatOptions = { hideCurrencySymbol: input.hideCurrencySymbol ?? false };
+  const title = buildTitle(titleSymbols, titleQuotes, input.isLoading, input.hideTitleSymbols ?? false, priceFormatOptions);
+  const items = displayQuotes.map((quote) => ({ title: `${quote.symbol}: ${formatPrice(quote.price, priceFormatOptions)}` }));
   const sections: MenuSectionModel[] = [];
 
   const sourceLine = buildSourceLine(displayQuotes);
@@ -55,14 +57,22 @@ export function buildMenuBarModel(input: BuildMenuBarModelInput): MenuBarModel {
   return { title, items, sections };
 }
 
-function buildTitle(titleSymbols: string[], titleQuotes: Quote[], isLoading: boolean, hideTitleSymbols: boolean) {
+function buildTitle(
+  titleSymbols: string[],
+  titleQuotes: Quote[],
+  isLoading: boolean,
+  hideTitleSymbols: boolean,
+  priceFormatOptions: { hideCurrencySymbol: boolean }
+) {
   if (titleSymbols.length === 0) {
     return "No symbols";
   }
   if (titleQuotes.length === 0) {
     return isLoading ? "Loading..." : "No prices found";
   }
-  return titleQuotes.map((quote) => (hideTitleSymbols ? formatPrice(quote.price) : `${quote.symbol} ${formatPrice(quote.price)}`)).join(" · ");
+  return titleQuotes
+    .map((quote) => (hideTitleSymbols ? formatPrice(quote.price, priceFormatOptions) : `${quote.symbol} ${formatPrice(quote.price, priceFormatOptions)}`))
+    .join(" · ");
 }
 
 function buildSourceLine(displayQuotes: Quote[]): string | undefined {

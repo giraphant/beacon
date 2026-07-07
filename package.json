@@ -21,7 +21,7 @@
     {
       "title": "Coins",
       "name": "coins",
-      "description": "Symbols to show in the menu bar, separated by spaces, commas, or vertical bars",
+      "description": "Symbols to watch; use | to keep later symbols in the dropdown only",
       "type": "textfield",
       "placeholder": "BTC ETH NVDA QQQ",
       "default": "BTC ETH NVDA QQQ",
@@ -34,6 +34,32 @@
       "type": "checkbox",
       "default": false,
       "required": false
+    },
+    {
+      "title": "Hide Currency Symbol",
+      "name": "hideCurrencySymbol",
+      "description": "Show prices without the currency symbol",
+      "type": "checkbox",
+      "default": false,
+      "required": false
+    },
+    {
+      "name": "source",
+      "title": "Preferred Source",
+      "description": "Source to try first before falling back to the other source",
+      "type": "dropdown",
+      "required": false,
+      "default": "Bybit",
+      "data": [
+        {
+          "title": "Bybit first",
+          "value": "Bybit"
+        },
+        {
+          "title": "Binance first",
+          "value": "Binance"
+        }
+      ]
     },
     {
       "title": "Alert Rules",

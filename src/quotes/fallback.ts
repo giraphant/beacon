@@ -14,13 +14,17 @@ export type QuoteSource = {
   fetchQuotes: (symbols: string[]) => Promise<Record<string, Quote>>;
 };
 
-const DEFAULT_SOURCES: QuoteSource[] = [
-  { name: "Bybit", fetchQuotes: fetchBybitLinearQuotes },
-  { name: "Binance", fetchQuotes: fetchBinanceSpotQuotes },
-];
+export type PreferredQuoteSource = "Bybit" | "Binance";
 
-export function fetchQuotesWithFallback(symbols: string[]) {
-  return fetchQuotesFromSources(symbols, DEFAULT_SOURCES, Date.now());
+const BYBIT_SOURCE: QuoteSource = { name: "Bybit", fetchQuotes: fetchBybitLinearQuotes };
+const BINANCE_SOURCE: QuoteSource = { name: "Binance", fetchQuotes: fetchBinanceSpotQuotes };
+
+export function getQuoteSources(preferredSource: PreferredQuoteSource | undefined): QuoteSource[] {
+  return preferredSource === "Binance" ? [BINANCE_SOURCE, BYBIT_SOURCE] : [BYBIT_SOURCE, BINANCE_SOURCE];
+}
+
+export function fetchQuotesWithFallback(symbols: string[], preferredSource?: PreferredQuoteSource) {
+  return fetchQuotesFromSources(symbols, getQuoteSources(preferredSource), Date.now());
 }
 
 export async function fetchQuotesFromSources(

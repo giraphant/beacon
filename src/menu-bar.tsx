@@ -7,12 +7,14 @@ import { notifyAlert } from "#/alerts/raycastNotifier";
 import { runAlerts } from "#/alerts/runAlerts";
 import { parseAlertRulesText, parseCoinDisplayText } from "#/config/preferences";
 import { buildMenuBarModel } from "#/menu/model";
-import { fetchQuotesWithFallback, type QuoteFetchResult } from "#/quotes/fallback";
+import { fetchQuotesWithFallback, type PreferredQuoteSource, type QuoteFetchResult } from "#/quotes/fallback";
 
 type MenuBarPreferences = {
   coins?: string;
   alertRules?: string;
   hideMenuBarSymbols?: boolean;
+  hideCurrencySymbol?: boolean;
+  source?: PreferredQuoteSource;
 };
 
 type TaggedQuoteFetchResult = {
@@ -24,10 +26,11 @@ type TaggedQuoteFetchResult = {
 async function fetchTaggedQuotes(
   symbols: string[],
   ruleSignature: string,
-  quoteSymbolSignature: string
+  quoteSymbolSignature: string,
+  preferredSource: PreferredQuoteSource | undefined
 ): Promise<TaggedQuoteFetchResult> {
   return {
-    result: await fetchQuotesWithFallback(symbols),
+    result: await fetchQuotesWithFallback(symbols, preferredSource),
     ruleSignature,
     quoteSymbolSignature,
   };
@@ -44,7 +47,8 @@ export default function Command() {
     [displaySymbols, parsedRules.rules]
   );
   const ruleSignature = useMemo(() => createAlertRuleSignature(parsedRules.rules), [parsedRules.rules]);
-  const quoteSymbolSignature = useMemo(() => createQuoteSymbolSignature(quoteSymbols), [quoteSymbols]);
+  const preferredSource = preferences.source ?? "Bybit";
+  const quoteSymbolSignature = useMemo(() => `${preferredSource}:${createQuoteSymbolSignature(quoteSymbols)}`, [preferredSource, quoteSymbols]);
   const alertScheduler = useMemo(
     () =>
       createFreshQuoteAlertScheduler({
@@ -62,7 +66,7 @@ export default function Command() {
   );
 
   const [cachedQuotes, setCachedQuotes] = useCachedState<QuoteFetchResult | undefined>("quote-cache", undefined);
-  const { data, isLoading, error } = usePromise(fetchTaggedQuotes, [quoteSymbols, ruleSignature, quoteSymbolSignature], {
+  const { data, isLoading, error } = usePromise(fetchTaggedQuotes, [quoteSymbols, ruleSignature, quoteSymbolSignature, preferredSource], {
     execute: quoteSymbols.length > 0,
     onData: ({ result }) => setCachedQuotes(result),
     onError: () => undefined,
@@ -90,6 +94,7 @@ export default function Command() {
     displaySymbols,
     titleSymbols,
     hideTitleSymbols: preferences.hideMenuBarSymbols ?? false,
+    hideCurrencySymbol: preferences.hideCurrencySymbol ?? false,
     quoteResult: error && cachedQuotes ? { ...cachedQuotes, errors: [error.message] } : quoteResult,
     invalidRuleTokens: parsedRules.invalidTokens,
     isLoading,

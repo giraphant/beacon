@@ -1,5 +1,5 @@
 import type { Quote } from "#/types";
-import { fetchQuotesFromSources, type QuoteSource } from "./fallback";
+import { fetchQuotesFromSources, getQuoteSources, type QuoteSource } from "./fallback";
 
 const quote = (symbol: string, source: string): Quote => ({
   symbol,
@@ -40,5 +40,15 @@ describe("fetchQuotesFromSources", () => {
     expect(result.quotes.BTC.source).toBe("Binance");
     expect(result.missingSymbols).toEqual(["SOL"]);
     expect(result.errors).toEqual(["Bybit: down"]);
+  });
+});
+
+describe("getQuoteSources", () => {
+  it("defaults to Bybit before Binance", () => {
+    expect(getQuoteSources(undefined).map((source) => source.name)).toEqual(["Bybit", "Binance"]);
+  });
+
+  it("can prefer Binance before Bybit", () => {
+    expect(getQuoteSources("Binance").map((source) => source.name)).toEqual(["Binance", "Bybit"]);
   });
 });
