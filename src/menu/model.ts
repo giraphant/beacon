@@ -1,5 +1,7 @@
 import type { Quote } from "#/types";
 import type { QuoteFetchResult } from "#/quotes/fallback";
+import type { RecentAlertsBySymbol } from "#/alerts/recentAlertState";
+import { getRecentAlertIndicator } from "#/alerts/recentAlertState";
 import { formatAge, formatPrice } from "#/utils/format";
 
 export type MenuItemModel = { title: string };
@@ -17,6 +19,7 @@ export type BuildMenuBarModelInput = {
   hideCurrencySymbol?: boolean;
   quoteResult: QuoteFetchResult | undefined;
   invalidRuleTokens: string[];
+  recentAlerts?: RecentAlertsBySymbol;
   isLoading: boolean;
   now: number;
 };
@@ -29,9 +32,10 @@ export function buildMenuBarModel(input: BuildMenuBarModelInput): MenuBarModel {
   const titleQuotes = titleSymbols.map((symbol) => quotes[symbol]).filter((quote): quote is Quote => Boolean(quote));
   const dropdownQuotes = displayQuotes.filter((quote) => !titleSymbolSet.has(quote.symbol));
 
+  const recentAlerts = input.recentAlerts ?? {};
   const priceFormatOptions = { hideCurrencySymbol: input.hideCurrencySymbol ?? false };
   const title = buildTitle(titleSymbols, titleQuotes, input.isLoading, input.hideTitleSymbols ?? false, priceFormatOptions);
-  const items = dropdownQuotes.map((quote) => ({ title: `${quote.symbol}: ${formatPrice(quote.price, priceFormatOptions)}` }));
+  const items = dropdownQuotes.map((quote) => ({ title: formatQuoteTitle(quote, false, priceFormatOptions, recentAlerts, true) }));
   const sections: MenuSectionModel[] = [];
 
   const sourceLine = buildSourceLine(displayQuotes);
@@ -72,9 +76,26 @@ function buildTitle(
   if (titleQuotes.length === 0) {
     return isLoading ? "Loading..." : "No prices found";
   }
-  return titleQuotes
-    .map((quote) => (hideTitleSymbols ? formatPrice(quote.price, priceFormatOptions) : `${quote.symbol} ${formatPrice(quote.price, priceFormatOptions)}`))
-    .join(" · ");
+  return titleQuotes.map((quote) => formatTitleQuote(quote, hideTitleSymbols, priceFormatOptions)).join(" · ");
+}
+
+function formatTitleQuote(quote: Quote, hideSymbol: boolean, priceFormatOptions: { hideCurrencySymbol: boolean }) {
+  const price = formatPrice(quote.price, priceFormatOptions);
+  return hideSymbol ? price : `${quote.symbol} ${price}`;
+}
+
+function formatQuoteTitle(
+  quote: Quote,
+  hideSymbol: boolean,
+  priceFormatOptions: { hideCurrencySymbol: boolean },
+  recentAlerts: RecentAlertsBySymbol,
+  useDropdownSeparator = false
+) {
+  const alert = recentAlerts[quote.symbol];
+  const alertPrefix = alert ? `${getRecentAlertIndicator(alert)} ` : "";
+  const price = formatPrice(quote.price, priceFormatOptions);
+  const separator = useDropdownSeparator ? ": " : " ";
+  return hideSymbol ? `${alertPrefix}${price}` : `${alertPrefix}${quote.symbol}${separator}${price}`;
 }
 
 function buildSourceLine(displayQuotes: Quote[]): string | undefined {

@@ -1,7 +1,8 @@
-import { MenuBarExtra, getPreferenceValues, openCommandPreferences } from "@raycast/api";
+import { Color, Icon, MenuBarExtra, getPreferenceValues, openCommandPreferences, showHUD } from "@raycast/api";
 import { useCachedState, usePromise } from "@raycast/utils";
 import { useEffect, useMemo } from "react";
 import { createAlertRuleSignature, createFreshQuoteAlertScheduler, createQuoteSymbolSignature } from "#/alerts/freshQuoteAlertScheduler";
+import { createRecentAlert, RECENT_ALERTS_CACHE_KEY, type RecentAlertsBySymbol } from "#/alerts/recentAlertState";
 import { getAlertState, saveAlertState } from "#/alerts/raycastState";
 import { notifyAlert } from "#/alerts/raycastNotifier";
 import { runAlerts } from "#/alerts/runAlerts";
@@ -49,6 +50,7 @@ export default function Command() {
   const ruleSignature = useMemo(() => createAlertRuleSignature(parsedRules.rules), [parsedRules.rules]);
   const preferredSource = preferences.source ?? "Bybit";
   const quoteSymbolSignature = useMemo(() => `${preferredSource}:${createQuoteSymbolSignature(quoteSymbols)}`, [preferredSource, quoteSymbols]);
+  const [recentAlerts, setRecentAlerts] = useCachedState<RecentAlertsBySymbol>(RECENT_ALERTS_CACHE_KEY, {});
   const alertScheduler = useMemo(
     () =>
       createFreshQuoteAlertScheduler({
@@ -59,10 +61,13 @@ export default function Command() {
             now,
             getState: getAlertState,
             saveState: saveAlertState,
-            notify: notifyAlert,
+            notify: async (notification) => {
+              await notifyAlert(notification);
+              setRecentAlerts((alerts) => ({ ...alerts, [notification.symbol]: createRecentAlert(notification, now) }));
+            },
           }),
       }),
-    []
+    [setRecentAlerts]
   );
 
   const [cachedQuotes, setCachedQuotes] = useCachedState<QuoteFetchResult | undefined>("quote-cache", undefined);
@@ -97,12 +102,18 @@ export default function Command() {
     hideCurrencySymbol: preferences.hideCurrencySymbol ?? false,
     quoteResult: error && cachedQuotes ? { ...cachedQuotes, errors: [error.message] } : quoteResult,
     invalidRuleTokens: parsedRules.invalidTokens,
+    recentAlerts,
     isLoading,
     now: Date.now(),
   });
+  const recentAlertValues = Object.values(recentAlerts);
+  const alertIcon =
+    recentAlertValues.length > 0
+      ? { source: Icon.CircleFilled, tintColor: recentAlertValues.some((alert) => alert.direction === "down") ? Color.Red : Color.Green }
+      : undefined;
 
   return (
-    <MenuBarExtra isLoading={isLoading} title={model.title}>
+    <MenuBarExtra icon={alertIcon} isLoading={isLoading} title={model.title}>
       {model.items.map((item) => (
         <MenuBarExtra.Item key={item.title} title={item.title} onAction={() => undefined} />
       ))}
@@ -114,6 +125,15 @@ export default function Command() {
         </MenuBarExtra.Section>
       ))}
       <MenuBarExtra.Section>
+        {Object.keys(recentAlerts).length > 0 && (
+          <MenuBarExtra.Item
+            title="Dismiss Alerts"
+            onAction={() => {
+              setRecentAlerts({});
+              showHUD("Beacon alerts dismissed");
+            }}
+          />
+        )}
         <MenuBarExtra.Item title="Settings" onAction={openCommandPreferences} shortcut={{ key: ",", modifiers: ["cmd"] }} />
       </MenuBarExtra.Section>
     </MenuBarExtra>

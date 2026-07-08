@@ -17,7 +17,9 @@ type ExtensionPreferences = {
   /** Preferred Source - Preferred source; Beacon falls back to the other source when needed */
   "source": "Bybit" | "Binance",
   /** Alert Rules - Looping percent alerts. Format: SYMBOL:PERCENT, for example BTC:1 means alert every 1% move from the last alert price. */
-  "alertRules": string
+  "alertRules": string,
+  /** Alert Sound - Play a short sound when Beacon shows a price alert HUD and toast */
+  "alertSoundEnabled": boolean
 }
 
 /** Preferences accessible in all the extension's commands */
