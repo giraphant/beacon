@@ -71,6 +71,15 @@
       "placeholder": "BTC:1 SOL:2 HYPE:3",
       "default": "",
       "required": false
+    },
+    {
+      "title": "Alert Sound",
+      "name": "alertSoundEnabled",
+      "label": "Play sound on price alerts",
+      "description": "Play a short sound when Beacon shows a price alert HUD and toast",
+      "type": "checkbox",
+      "default": false,
+      "required": false
     }
   ],
   "dependencies": {
