@@ -50,7 +50,6 @@ describe("Raycast alert state adapter", () => {
   });
 });
 
-
 test("returns undefined for incomplete or malformed alert state JSON", async () => {
   mockedLocalStorage.getItem
     .mockResolvedValueOnce(JSON.stringify({ symbol: "BTC" }))
@@ -70,7 +69,6 @@ test("stores state under a rule identity key including threshold", async () => {
     JSON.stringify({ symbol: "BTC", lastBaselinePrice: 200 })
   );
 });
-
 
 test("returns undefined when stored alert state belongs to a different symbol", async () => {
   mockedLocalStorage.getItem.mockResolvedValueOnce(JSON.stringify({ symbol: "ETH", lastBaselinePrice: 100 }));

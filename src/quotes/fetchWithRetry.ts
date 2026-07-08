@@ -28,7 +28,12 @@ export async function fetchJsonWithRetry<T>(url: string, options: FetchJsonOptio
       lastError = error instanceof Error ? error : new Error(String(error));
       if (attempt === attempts - 1) {
         if (options.useCurl) {
-          return await fetchJsonWithCurl<T>(url, timeoutMs, options.curlRunner ?? runCurl, options.scutilRunner ?? runScutilProxy);
+          return await fetchJsonWithCurl<T>(
+            url,
+            timeoutMs,
+            options.curlRunner ?? runCurl,
+            options.scutilRunner ?? runScutilProxy
+          );
         }
         throw lastError;
       }
@@ -46,7 +51,12 @@ async function fetchJson<T>(url: string, timeoutMs: number, fetcher: Fetcher): P
   return (await response.json()) as T;
 }
 
-async function fetchJsonWithCurl<T>(url: string, timeoutMs: number, curlRunner: CurlRunner, scutilRunner: ScutilRunner): Promise<T> {
+async function fetchJsonWithCurl<T>(
+  url: string,
+  timeoutMs: number,
+  curlRunner: CurlRunner,
+  scutilRunner: ScutilRunner
+): Promise<T> {
   const proxyArgs = getHttpsProxyArgs(await scutilRunner());
   const response = await curlRunner(url, timeoutMs, proxyArgs);
   if (response.status < 200 || response.status >= 300) {
@@ -83,7 +93,17 @@ function runCurl(url: string, timeoutMs: number, proxyArgs: string[]): Promise<{
   return new Promise((resolve, reject) => {
     execFile(
       "/usr/bin/curl",
-      ["--silent", "--show-error", "--location", "--max-time", String(Math.ceil(timeoutMs / 1000)), ...proxyArgs, "--write-out", "\n%{http_code}", url],
+      [
+        "--silent",
+        "--show-error",
+        "--location",
+        "--max-time",
+        String(Math.ceil(timeoutMs / 1000)),
+        ...proxyArgs,
+        "--write-out",
+        "\n%{http_code}",
+        url,
+      ],
       { maxBuffer: 10 * 1024 * 1024 },
       (error, stdout, stderr) => {
         if (error) {

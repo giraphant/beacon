@@ -83,7 +83,6 @@ describe("evaluateAlert", () => {
   });
 });
 
-
 it("does nothing for non-finite current prices", () => {
   expect(evaluateAlert(rule, quote(Number.NaN), state(100), 10_000)).toEqual({ kind: "none" });
   expect(evaluateAlert(rule, quote(Number.POSITIVE_INFINITY), state(100), 10_000)).toEqual({ kind: "none" });

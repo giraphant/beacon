@@ -4,8 +4,8 @@
   "title": "Beacon",
   "description": "A price signal beacon for Raycast menu bar alerts",
   "icon": "command-icon.png",
-  "author": "giraphant",
-  "owner": "giraphant",
+  "author": "ramuyu",
+  "owner": "inol",
   "categories": ["Finance"],
   "license": "MIT",
   "commands": [

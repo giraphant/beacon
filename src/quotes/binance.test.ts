@@ -17,14 +17,22 @@ describe("fetchBinanceSpotQuotes", () => {
 
   it("skips tickers with non-finite or non-positive price, high, or low values", async () => {
     mockedFetchJsonWithRetry.mockResolvedValueOnce([
-          { symbol: "BTCUSDT", lastPrice: "100", highPrice: "110", lowPrice: "90" },
-          { symbol: "ETHUSDT", lastPrice: "NaN", highPrice: "210", lowPrice: "190" },
-          { symbol: "SOLUSDT", lastPrice: "50", highPrice: "Infinity", lowPrice: "40" },
-          { symbol: "DOGEUSDT", lastPrice: "0", highPrice: "1", lowPrice: "0.1" },
-        ] as never);
+      { symbol: "BTCUSDT", lastPrice: "100", highPrice: "110", lowPrice: "90" },
+      { symbol: "ETHUSDT", lastPrice: "NaN", highPrice: "210", lowPrice: "190" },
+      { symbol: "SOLUSDT", lastPrice: "50", highPrice: "Infinity", lowPrice: "40" },
+      { symbol: "DOGEUSDT", lastPrice: "0", highPrice: "1", lowPrice: "0.1" },
+    ] as never);
 
     await expect(fetchBinanceSpotQuotes(["BTC", "ETH", "SOL", "DOGE"])).resolves.toEqual({
-      BTC: { symbol: "BTC", name: "Bitcoin", price: 100, high24h: 110, low24h: 90, source: "Binance spot (USDT)", updatedAt: 1234 },
+      BTC: {
+        symbol: "BTC",
+        name: "Bitcoin",
+        price: 100,
+        high24h: 110,
+        low24h: 90,
+        source: "Binance spot (USDT)",
+        updatedAt: 1234,
+      },
     });
   });
 });

@@ -16,15 +16,28 @@ describe("fetchBybitLinearQuotes", () => {
   });
 
   it("skips tickers with non-finite or non-positive price, high, or low values", async () => {
-    mockedFetchJsonWithRetry.mockResolvedValueOnce({ retCode: 0, result: { list: [
+    mockedFetchJsonWithRetry.mockResolvedValueOnce({
+      retCode: 0,
+      result: {
+        list: [
           { symbol: "BTCUSDT", lastPrice: "100", highPrice24h: "110", lowPrice24h: "90" },
           { symbol: "ETHUSDT", lastPrice: "NaN", highPrice24h: "210", lowPrice24h: "190" },
           { symbol: "SOLUSDT", lastPrice: "50", highPrice24h: "Infinity", lowPrice24h: "40" },
           { symbol: "DOGEUSDT", lastPrice: "0", highPrice24h: "1", lowPrice24h: "0.1" },
-        ] } } as never);
+        ],
+      },
+    } as never);
 
     await expect(fetchBybitLinearQuotes(["BTC", "ETH", "SOL", "DOGE"])).resolves.toEqual({
-      BTC: { symbol: "BTC", name: "Bitcoin", price: 100, high24h: 110, low24h: 90, source: "Bybit linear (USDT)", updatedAt: 1234 },
+      BTC: {
+        symbol: "BTC",
+        name: "Bitcoin",
+        price: 100,
+        high24h: 110,
+        low24h: 90,
+        source: "Bybit linear (USDT)",
+        updatedAt: 1234,
+      },
     });
   });
 });

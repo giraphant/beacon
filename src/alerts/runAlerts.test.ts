@@ -1,7 +1,13 @@
 import type { AlertNotification, AlertRule, AlertState, Quote } from "#/types";
 import { runAlerts } from "./runAlerts";
 
-const quote = (symbol: string, price: number): Quote => ({ symbol, name: symbol, price, source: "Test", updatedAt: 1_000 });
+const quote = (symbol: string, price: number): Quote => ({
+  symbol,
+  name: symbol,
+  price,
+  source: "Test",
+  updatedAt: 1_000,
+});
 const rule = (symbol: string, thresholdPercent: number): AlertRule => ({ symbol, thresholdPercent, enabled: true });
 
 describe("runAlerts", () => {
@@ -42,7 +48,9 @@ describe("runAlerts", () => {
     });
 
     expect(result).toEqual({ initialized: 0, triggered: 1, skipped: 0, failed: 0 });
-    expect(saved).toEqual([{ symbol: "BTC", lastBaselinePrice: 102, lastTriggeredAt: 10_000, lastTriggeredPrice: 102 }]);
+    expect(saved).toEqual([
+      { symbol: "BTC", lastBaselinePrice: 102, lastTriggeredAt: 10_000, lastTriggeredPrice: 102 },
+    ]);
   });
 
   it("does not save trigger state when notification fails", async () => {
@@ -78,7 +86,6 @@ describe("runAlerts", () => {
     expect(result).toEqual({ initialized: 0, triggered: 0, skipped: 1, failed: 0 });
   });
 });
-
 
 it("uses rule identity when loading and saving state", async () => {
   const requested: string[] = [];

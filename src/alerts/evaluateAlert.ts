@@ -49,9 +49,9 @@ export function evaluateAlert(
     notification: {
       symbol: rule.symbol,
       title: `${rule.symbol} ${verb} ${formatPercent(absoluteMovementPercent).replace("+", "")}`,
-      message: `${formatPrice(state.lastBaselinePrice)} → ${formatPrice(quote.price)}, crossed ${crossedSteps} × ${formatPercent(
-        rule.thresholdPercent
-      ).replace("+", "")} steps`,
+      message: `${formatPrice(state.lastBaselinePrice)} → ${formatPrice(
+        quote.price
+      )}, crossed ${crossedSteps} × ${formatPercent(rule.thresholdPercent).replace("+", "")} steps`,
       movementPercent,
       thresholdPercent: rule.thresholdPercent,
       crossedSteps,

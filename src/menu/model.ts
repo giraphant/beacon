@@ -26,7 +26,9 @@ export type BuildMenuBarModelInput = {
 
 export function buildMenuBarModel(input: BuildMenuBarModelInput): MenuBarModel {
   const quotes = input.quoteResult?.quotes ?? {};
-  const displayQuotes = input.displaySymbols.map((symbol) => quotes[symbol]).filter((quote): quote is Quote => Boolean(quote));
+  const displayQuotes = input.displaySymbols
+    .map((symbol) => quotes[symbol])
+    .filter((quote): quote is Quote => Boolean(quote));
   const titleSymbols = input.titleSymbols ?? input.displaySymbols;
   const titleSymbolSet = new Set(titleSymbols);
   const titleQuotes = titleSymbols.map((symbol) => quotes[symbol]).filter((quote): quote is Quote => Boolean(quote));
@@ -34,8 +36,16 @@ export function buildMenuBarModel(input: BuildMenuBarModelInput): MenuBarModel {
 
   const recentAlerts = input.recentAlerts ?? {};
   const priceFormatOptions = { hideCurrencySymbol: input.hideCurrencySymbol ?? false };
-  const title = buildTitle(titleSymbols, titleQuotes, input.isLoading, input.hideTitleSymbols ?? false, priceFormatOptions);
-  const items = dropdownQuotes.map((quote) => ({ title: formatQuoteTitle(quote, false, priceFormatOptions, recentAlerts, true) }));
+  const title = buildTitle(
+    titleSymbols,
+    titleQuotes,
+    input.isLoading,
+    input.hideTitleSymbols ?? false,
+    priceFormatOptions
+  );
+  const items = dropdownQuotes.map((quote) => ({
+    title: formatQuoteTitle(quote, false, priceFormatOptions, recentAlerts, true),
+  }));
   const sections: MenuSectionModel[] = [];
 
   const sourceLine = buildSourceLine(displayQuotes);
@@ -43,9 +53,15 @@ export function buildMenuBarModel(input: BuildMenuBarModelInput): MenuBarModel {
   if (input.quoteResult) {
     const statusItems = [
       sourceLine ? { title: sourceLine } : undefined,
-      input.quoteResult.updatedAt ? { title: `Updated: ${formatAge(input.quoteResult.updatedAt, input.now)}` } : undefined,
-      input.quoteResult.missingSymbols.length > 0 ? { title: `Not found: ${input.quoteResult.missingSymbols.join(", ")}` } : undefined,
-      input.quoteResult.errors.length > 0 ? { title: `Refresh issues: ${input.quoteResult.errors.join("; ")}` } : undefined,
+      input.quoteResult.updatedAt
+        ? { title: `Updated: ${formatAge(input.quoteResult.updatedAt, input.now)}` }
+        : undefined,
+      input.quoteResult.missingSymbols.length > 0
+        ? { title: `Not found: ${input.quoteResult.missingSymbols.join(", ")}` }
+        : undefined,
+      input.quoteResult.errors.length > 0
+        ? { title: `Refresh issues: ${input.quoteResult.errors.join("; ")}` }
+        : undefined,
     ].filter((item): item is MenuItemModel => Boolean(item));
 
     if (statusItems.length > 0) {

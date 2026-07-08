@@ -1,7 +1,11 @@
 import { Color, Icon, MenuBarExtra, getPreferenceValues, openCommandPreferences, showHUD } from "@raycast/api";
 import { useCachedState, usePromise } from "@raycast/utils";
 import { useEffect, useMemo } from "react";
-import { createAlertRuleSignature, createFreshQuoteAlertScheduler, createQuoteSymbolSignature } from "#/alerts/freshQuoteAlertScheduler";
+import {
+  createAlertRuleSignature,
+  createFreshQuoteAlertScheduler,
+  createQuoteSymbolSignature,
+} from "#/alerts/freshQuoteAlertScheduler";
 import { createRecentAlert, RECENT_ALERTS_CACHE_KEY, type RecentAlertsBySymbol } from "#/alerts/recentAlertState";
 import { getAlertState, saveAlertState } from "#/alerts/raycastState";
 import { notifyAlert } from "#/alerts/raycastNotifier";
@@ -49,7 +53,10 @@ export default function Command() {
   );
   const ruleSignature = useMemo(() => createAlertRuleSignature(parsedRules.rules), [parsedRules.rules]);
   const preferredSource = preferences.source ?? "Bybit";
-  const quoteSymbolSignature = useMemo(() => `${preferredSource}:${createQuoteSymbolSignature(quoteSymbols)}`, [preferredSource, quoteSymbols]);
+  const quoteSymbolSignature = useMemo(
+    () => `${preferredSource}:${createQuoteSymbolSignature(quoteSymbols)}`,
+    [preferredSource, quoteSymbols]
+  );
   const [recentAlerts, setRecentAlerts] = useCachedState<RecentAlertsBySymbol>(RECENT_ALERTS_CACHE_KEY, {});
   const alertScheduler = useMemo(
     () =>
@@ -71,11 +78,15 @@ export default function Command() {
   );
 
   const [cachedQuotes, setCachedQuotes] = useCachedState<QuoteFetchResult | undefined>("quote-cache", undefined);
-  const { data, isLoading, error } = usePromise(fetchTaggedQuotes, [quoteSymbols, ruleSignature, quoteSymbolSignature, preferredSource], {
-    execute: quoteSymbols.length > 0,
-    onData: ({ result }) => setCachedQuotes(result),
-    onError: () => undefined,
-  });
+  const { data, isLoading, error } = usePromise(
+    fetchTaggedQuotes,
+    [quoteSymbols, ruleSignature, quoteSymbolSignature, preferredSource],
+    {
+      execute: quoteSymbols.length > 0,
+      onData: ({ result }) => setCachedQuotes(result),
+      onError: () => undefined,
+    }
+  );
 
   const quoteResult = data?.result ?? cachedQuotes;
 
@@ -109,7 +120,10 @@ export default function Command() {
   const recentAlertValues = Object.values(recentAlerts);
   const alertIcon =
     recentAlertValues.length > 0
-      ? { source: Icon.CircleFilled, tintColor: recentAlertValues.some((alert) => alert.direction === "down") ? Color.Red : Color.Green }
+      ? {
+          source: Icon.CircleFilled,
+          tintColor: recentAlertValues.some((alert) => alert.direction === "down") ? Color.Red : Color.Green,
+        }
       : undefined;
 
   return (
@@ -134,7 +148,11 @@ export default function Command() {
             }}
           />
         )}
-        <MenuBarExtra.Item title="Settings" onAction={openCommandPreferences} shortcut={{ key: ",", modifiers: ["cmd"] }} />
+        <MenuBarExtra.Item
+          title="Settings"
+          onAction={openCommandPreferences}
+          shortcut={{ key: ",", modifiers: ["cmd"] }}
+        />
       </MenuBarExtra.Section>
     </MenuBarExtra>
   );

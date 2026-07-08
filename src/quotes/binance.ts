@@ -12,7 +12,11 @@ type BinanceTicker = {
 };
 
 export async function fetchBinanceSpotQuotes(symbols: string[]): Promise<Record<string, Quote>> {
-  const data = await fetchJsonWithRetry<unknown>(getTickersUrl(symbols), { attempts: 1, timeoutMs: 3500, useCurl: true });
+  const data = await fetchJsonWithRetry<unknown>(getTickersUrl(symbols), {
+    attempts: 1,
+    timeoutMs: 3500,
+    useCurl: true,
+  });
   if (!Array.isArray(data)) {
     return {};
   }

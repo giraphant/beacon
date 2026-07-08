@@ -43,7 +43,6 @@ describe("parseAlertRulesText", () => {
   });
 });
 
-
 describe("parseCoinDisplayText", () => {
   it("splits title symbols before the pipe from dropdown quote symbols", () => {
     expect(parseCoinDisplayText("BTC ETH | NVDA QQQ")).toEqual({

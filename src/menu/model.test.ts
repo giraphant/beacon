@@ -2,14 +2,25 @@ import type { Quote } from "#/types";
 import type { RecentAlertsBySymbol } from "#/alerts/recentAlertState";
 import { buildMenuBarModel } from "./model";
 
-const quote = (symbol: string, price: number): Quote => ({ symbol, name: symbol, price, source: "Test", updatedAt: 1_000 });
+const quote = (symbol: string, price: number): Quote => ({
+  symbol,
+  name: symbol,
+  price,
+  source: "Test",
+  updatedAt: 1_000,
+});
 
 describe("buildMenuBarModel", () => {
   it("builds a compact title from display symbols only", () => {
     const model = buildMenuBarModel({
       displaySymbols: ["BTC", "ETH"],
       titleSymbols: ["BTC", "ETH"],
-      quoteResult: { quotes: { BTC: quote("BTC", 100), ETH: quote("ETH", 200), SOL: quote("SOL", 50) }, missingSymbols: [], errors: [], updatedAt: 1_000 },
+      quoteResult: {
+        quotes: { BTC: quote("BTC", 100), ETH: quote("ETH", 200), SOL: quote("SOL", 50) },
+        missingSymbols: [],
+        errors: [],
+        updatedAt: 1_000,
+      },
       invalidRuleTokens: [],
       isLoading: false,
       now: 12_000,
@@ -28,7 +39,9 @@ describe("buildMenuBarModel", () => {
       now: 12_000,
     });
 
-    expect(model.sections.flatMap((section) => section.items.map((item) => item.title)).join(" ")).not.toContain("Alert");
+    expect(model.sections.flatMap((section) => section.items.map((item) => item.title)).join(" ")).not.toContain(
+      "Alert"
+    );
   });
 
   it("shows concise invalid rule tokens only when present", () => {
@@ -90,7 +103,6 @@ describe("buildMenuBarModel", () => {
   });
 });
 
-
 it("shows dropdown rows for quote symbols that are hidden from the menu bar title by pipe", () => {
   const model = buildMenuBarModel({
     displaySymbols: ["BTC", "ETH", "NVDA", "QQQ"],
@@ -114,7 +126,12 @@ it("can hide symbols in the menu bar title while preserving dropdown row symbols
   const model = buildMenuBarModel({
     displaySymbols: ["BTC", "ETH"],
     hideTitleSymbols: true,
-    quoteResult: { quotes: { BTC: quote("BTC", 100), ETH: quote("ETH", 200) }, missingSymbols: [], errors: [], updatedAt: 1_000 },
+    quoteResult: {
+      quotes: { BTC: quote("BTC", 100), ETH: quote("ETH", 200) },
+      missingSymbols: [],
+      errors: [],
+      updatedAt: 1_000,
+    },
     invalidRuleTokens: [],
     isLoading: false,
     now: 12_000,
@@ -128,7 +145,12 @@ it("can hide currency symbols in the title and dropdown rows", () => {
   const model = buildMenuBarModel({
     displaySymbols: ["BTC", "ETH"],
     hideCurrencySymbol: true,
-    quoteResult: { quotes: { BTC: quote("BTC", 100), ETH: quote("ETH", 200) }, missingSymbols: [], errors: [], updatedAt: 1_000 },
+    quoteResult: {
+      quotes: { BTC: quote("BTC", 100), ETH: quote("ETH", 200) },
+      missingSymbols: [],
+      errors: [],
+      updatedAt: 1_000,
+    },
     invalidRuleTokens: [],
     isLoading: false,
     now: 12_000,
@@ -159,7 +181,12 @@ it("marks quotes with recent alert direction and shows a recent alerts section",
   const model = buildMenuBarModel({
     displaySymbols: ["BTC", "QQQ"],
     titleSymbols: ["BTC"],
-    quoteResult: { quotes: { BTC: quote("BTC", 101), QQQ: quote("QQQ", 396) }, missingSymbols: [], errors: [], updatedAt: 1_000 },
+    quoteResult: {
+      quotes: { BTC: quote("BTC", 101), QQQ: quote("QQQ", 396) },
+      missingSymbols: [],
+      errors: [],
+      updatedAt: 1_000,
+    },
     invalidRuleTokens: [],
     recentAlerts,
     isLoading: false,
