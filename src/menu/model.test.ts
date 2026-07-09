@@ -160,6 +160,19 @@ it("can hide currency symbols in the title and dropdown rows", () => {
   expect(model.items.map((item) => item.title)).toEqual([]);
 });
 
+it("does not mark the menu bar as loading while cached prices are visible", () => {
+  const model = buildMenuBarModel({
+    displaySymbols: ["BTC"],
+    quoteResult: { quotes: { BTC: quote("BTC", 100) }, missingSymbols: [], errors: [], updatedAt: 1_000 },
+    invalidRuleTokens: [],
+    isLoading: true,
+    now: 12_000,
+  });
+
+  expect(model.title).toBe("BTC $100.00");
+  expect(model.isLoading).toBe(false);
+});
+
 it("marks quotes with recent alert direction and shows a recent alerts section", () => {
   const recentAlerts: RecentAlertsBySymbol = {
     BTC: {

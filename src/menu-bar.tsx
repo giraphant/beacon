@@ -127,7 +127,7 @@ export default function Command() {
       : undefined;
 
   return (
-    <MenuBarExtra icon={alertIcon} isLoading={isLoading} title={model.title}>
+    <MenuBarExtra icon={alertIcon} isLoading={model.isLoading} title={model.title}>
       {model.items.map((item) => (
         <MenuBarExtra.Item key={item.title} title={item.title} onAction={() => undefined} />
       ))}

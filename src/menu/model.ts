@@ -8,6 +8,7 @@ export type MenuItemModel = { title: string };
 export type MenuSectionModel = { title?: string; items: MenuItemModel[] };
 export type MenuBarModel = {
   title: string;
+  isLoading: boolean;
   items: MenuItemModel[];
   sections: MenuSectionModel[];
 };
@@ -43,6 +44,7 @@ export function buildMenuBarModel(input: BuildMenuBarModelInput): MenuBarModel {
     input.hideTitleSymbols ?? false,
     priceFormatOptions
   );
+  const isLoading = input.isLoading && titleQuotes.length === 0;
   const items = dropdownQuotes.map((quote) => ({
     title: formatQuoteTitle(quote, false, priceFormatOptions, recentAlerts, true),
   }));
@@ -76,7 +78,7 @@ export function buildMenuBarModel(input: BuildMenuBarModelInput): MenuBarModel {
     });
   }
 
-  return { title, items, sections };
+  return { title, isLoading, items, sections };
 }
 
 function buildTitle(
