@@ -1,4 +1,10 @@
-import { parseAlertRulesText, parseSymbolsText, parseCoinDisplayText } from "./preferences";
+import {
+  parseAlertRulesText,
+  parseCoinDisplayText,
+  parseIntegerAlertCooldownMinutes,
+  parseIntegerAlertRulesText,
+  parseSymbolsText,
+} from "./preferences";
 
 describe("parseSymbolsText", () => {
   it("normalizes space, comma, and vertical-bar separated symbols", () => {
@@ -55,6 +61,48 @@ describe("parseCoinDisplayText", () => {
     expect(parseCoinDisplayText("btc, eth nvda")).toEqual({
       titleSymbols: ["BTC", "ETH", "NVDA"],
       quoteSymbols: ["BTC", "ETH", "NVDA"],
+    });
+  });
+});
+
+describe("parseIntegerAlertCooldownMinutes", () => {
+  it("parses non-negative minute values and defaults invalid values to 10", () => {
+    expect(parseIntegerAlertCooldownMinutes("0")).toBe(0);
+    expect(parseIntegerAlertCooldownMinutes("5.5")).toBe(5.5);
+    expect(parseIntegerAlertCooldownMinutes("bad")).toBe(10);
+    expect(parseIntegerAlertCooldownMinutes(undefined)).toBe(10);
+  });
+});
+
+describe("parseIntegerAlertRulesText", () => {
+  it("parses symbol step pairs", () => {
+    expect(parseIntegerAlertRulesText("BTC:1000 sol:5 JUP:0.05")).toEqual({
+      rules: [
+        { symbol: "BTC", step: 1000, enabled: true },
+        { symbol: "SOL", step: 5, enabled: true },
+        { symbol: "JUP", step: 0.05, enabled: true },
+      ],
+      invalidTokens: [],
+    });
+  });
+
+  it("skips invalid tokens and keeps valid integer rules", () => {
+    expect(parseIntegerAlertRulesText("BTC:1000 nope ETH:-1 SOL:0 JUP:0.05")).toEqual({
+      rules: [
+        { symbol: "BTC", step: 1000, enabled: true },
+        { symbol: "JUP", step: 0.05, enabled: true },
+      ],
+      invalidTokens: ["nope", "ETH:-1", "SOL:0"],
+    });
+  });
+
+  it("lets the last duplicate integer rule win", () => {
+    expect(parseIntegerAlertRulesText("BTC:1000 ETH:5 BTC:500")).toEqual({
+      rules: [
+        { symbol: "ETH", step: 5, enabled: true },
+        { symbol: "BTC", step: 500, enabled: true },
+      ],
+      invalidTokens: [],
     });
   });
 });

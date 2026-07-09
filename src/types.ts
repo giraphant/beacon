@@ -15,6 +15,12 @@ export type AlertRule = {
   enabled: boolean;
 };
 
+export type IntegerAlertRule = {
+  symbol: string;
+  step: number;
+  enabled: boolean;
+};
+
 export type AlertState = {
   symbol: string;
   lastBaselinePrice: number;
@@ -22,8 +28,28 @@ export type AlertState = {
   lastTriggeredPrice?: number;
 };
 
+export type IntegerAlertBoundaryRange = {
+  startBucket: number;
+  endBucket: number;
+  triggeredAt: number;
+};
+
+export type IntegerAlertState = {
+  symbol: string;
+  lastBucket: number;
+  lastPrice: number;
+  lastTriggeredAt?: number;
+  lastTriggeredPrice?: number;
+  lastTriggeredBoundaryRanges?: IntegerAlertBoundaryRange[];
+};
+
 export type ParsedAlertRules = {
   rules: AlertRule[];
+  invalidTokens: string[];
+};
+
+export type ParsedIntegerAlertRules = {
+  rules: IntegerAlertRule[];
   invalidTokens: string[];
 };
 
@@ -42,3 +68,9 @@ export type AlertEvaluation =
   | { kind: "initialize"; nextState: AlertState }
   | { kind: "none" }
   | { kind: "trigger"; notification: AlertNotification; nextState: AlertState };
+
+export type IntegerAlertEvaluation =
+  | { kind: "initialize"; nextState: IntegerAlertState }
+  | { kind: "none" }
+  | { kind: "update"; nextState: IntegerAlertState }
+  | { kind: "trigger"; notification: AlertNotification; nextState: IntegerAlertState };

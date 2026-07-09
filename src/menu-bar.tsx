@@ -4,19 +4,28 @@ import { useEffect, useMemo } from "react";
 import {
   createAlertRuleSignature,
   createFreshQuoteAlertScheduler,
+  createIntegerAlertRuleSignature,
   createQuoteSymbolSignature,
 } from "#/alerts/freshQuoteAlertScheduler";
 import { createRecentAlert, RECENT_ALERTS_CACHE_KEY, type RecentAlertsBySymbol } from "#/alerts/recentAlertState";
-import { getAlertState, saveAlertState } from "#/alerts/raycastState";
+import { getAlertState, getIntegerAlertState, saveAlertState, saveIntegerAlertState } from "#/alerts/raycastState";
 import { notifyAlert } from "#/alerts/raycastNotifier";
 import { runAlerts } from "#/alerts/runAlerts";
-import { parseAlertRulesText, parseCoinDisplayText } from "#/config/preferences";
+import { runIntegerAlerts } from "#/alerts/runIntegerAlerts";
+import {
+  parseAlertRulesText,
+  parseCoinDisplayText,
+  parseIntegerAlertCooldownMinutes,
+  parseIntegerAlertRulesText,
+} from "#/config/preferences";
 import { buildMenuBarModel } from "#/menu/model";
 import { fetchQuotesWithFallback, type PreferredQuoteSource, type QuoteFetchResult } from "#/quotes/fallback";
 
 type MenuBarPreferences = {
   coins?: string;
   alertRules?: string;
+  integerAlertRules?: string;
+  integerAlertCooldownMinutes?: string;
   hideMenuBarSymbols?: boolean;
   hideCurrencySymbol?: boolean;
   source?: PreferredQuoteSource;
@@ -47,11 +56,28 @@ export default function Command() {
   const displaySymbols = coinDisplay.quoteSymbols;
   const titleSymbols = coinDisplay.titleSymbols;
   const parsedRules = useMemo(() => parseAlertRulesText(preferences.alertRules ?? ""), [preferences.alertRules]);
-  const quoteSymbols = useMemo(
-    () => [...new Set([...displaySymbols, ...parsedRules.rules.map((rule) => rule.symbol)])],
-    [displaySymbols, parsedRules.rules]
+  const parsedIntegerRules = useMemo(
+    () => parseIntegerAlertRulesText(preferences.integerAlertRules ?? ""),
+    [preferences.integerAlertRules]
   );
-  const ruleSignature = useMemo(() => createAlertRuleSignature(parsedRules.rules), [parsedRules.rules]);
+  const integerAlertCooldownMs = parseIntegerAlertCooldownMinutes(preferences.integerAlertCooldownMinutes) * 60_000;
+  const quoteSymbols = useMemo(
+    () => [
+      ...new Set([
+        ...displaySymbols,
+        ...parsedRules.rules.map((rule) => rule.symbol),
+        ...parsedIntegerRules.rules.map((rule) => rule.symbol),
+      ]),
+    ],
+    [displaySymbols, parsedRules.rules, parsedIntegerRules.rules]
+  );
+  const ruleSignature = useMemo(
+    () =>
+      [createAlertRuleSignature(parsedRules.rules), createIntegerAlertRuleSignature(parsedIntegerRules.rules)].join(
+        "||"
+      ),
+    [parsedRules.rules, parsedIntegerRules.rules]
+  );
   const preferredSource = preferences.source ?? "Bybit";
   const quoteSymbolSignature = useMemo(
     () => `${preferredSource}:${createQuoteSymbolSignature(quoteSymbols)}`,
@@ -61,18 +87,30 @@ export default function Command() {
   const alertScheduler = useMemo(
     () =>
       createFreshQuoteAlertScheduler({
-        runAlerts: ({ rules, quotes, now }) =>
-          runAlerts({
+        runAlerts: async ({ rules, integerRules, quotes, now, integerAlertCooldownMs }) => {
+          const notify = async (notification: Parameters<typeof notifyAlert>[0]) => {
+            await notifyAlert(notification);
+            setRecentAlerts((alerts) => ({ ...alerts, [notification.symbol]: createRecentAlert(notification, now) }));
+          };
+
+          await runAlerts({
             rules,
             quotes,
             now,
             getState: getAlertState,
             saveState: saveAlertState,
-            notify: async (notification) => {
-              await notifyAlert(notification);
-              setRecentAlerts((alerts) => ({ ...alerts, [notification.symbol]: createRecentAlert(notification, now) }));
-            },
-          }),
+            notify,
+          });
+          await runIntegerAlerts({
+            rules: integerRules,
+            quotes,
+            now,
+            integerAlertCooldownMs,
+            getState: getIntegerAlertState,
+            saveState: saveIntegerAlertState,
+            notify,
+          });
+        },
       }),
     [setRecentAlerts]
   );
@@ -97,14 +135,24 @@ export default function Command() {
 
     alertScheduler.submitFreshQuoteResult({
       rules: parsedRules.rules,
+      integerRules: parsedIntegerRules.rules,
       quotes: data.result.quotes,
       fetchRuleSignature: data.ruleSignature,
       currentRuleSignature: ruleSignature,
       fetchQuoteSymbolSignature: data.quoteSymbolSignature,
       currentQuoteSymbolSignature: quoteSymbolSignature,
       now: Date.now(),
+      integerAlertCooldownMs,
     });
-  }, [data, alertScheduler, parsedRules.rules, ruleSignature, quoteSymbolSignature]);
+  }, [
+    data,
+    alertScheduler,
+    parsedRules.rules,
+    parsedIntegerRules.rules,
+    ruleSignature,
+    quoteSymbolSignature,
+    integerAlertCooldownMs,
+  ]);
 
   const model = buildMenuBarModel({
     displaySymbols,
@@ -113,6 +161,7 @@ export default function Command() {
     hideCurrencySymbol: preferences.hideCurrencySymbol ?? false,
     quoteResult: error && cachedQuotes ? { ...cachedQuotes, errors: [error.message] } : quoteResult,
     invalidRuleTokens: parsedRules.invalidTokens,
+    invalidIntegerRuleTokens: parsedIntegerRules.invalidTokens,
     recentAlerts,
     isLoading,
     now: Date.now(),

@@ -49,11 +49,15 @@ describe("buildMenuBarModel", () => {
       displaySymbols: ["BTC"],
       quoteResult: { quotes: { BTC: quote("BTC", 100) }, missingSymbols: [], errors: [], updatedAt: 1_000 },
       invalidRuleTokens: ["bad", "ETH:-1"],
+      invalidIntegerRuleTokens: ["SOL:0"],
       isLoading: false,
       now: 12_000,
     });
 
-    expect(model.sections.at(-1)).toEqual({ title: "Configuration", items: [{ title: "Ignored rules: bad, ETH:-1" }] });
+    expect(model.sections.at(-1)).toEqual({
+      title: "Configuration",
+      items: [{ title: "Ignored rules: bad, ETH:-1" }, { title: "Ignored integer rules: SOL:0" }],
+    });
   });
 
   it("includes a concise source line for a single displayed quote source", () => {

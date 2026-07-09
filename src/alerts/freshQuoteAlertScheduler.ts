@@ -1,9 +1,11 @@
-import type { AlertRule, Quote } from "#/types";
+import type { AlertRule, IntegerAlertRule, Quote } from "#/types";
 
 export type FreshQuoteAlertRunInput = {
   rules: AlertRule[];
+  integerRules: IntegerAlertRule[];
   quotes: Record<string, Quote>;
   now: number;
+  integerAlertCooldownMs?: number;
 };
 
 export type FreshQuoteAlertSchedulerInput = FreshQuoteAlertRunInput & {
@@ -30,15 +32,17 @@ export function createFreshQuoteAlertScheduler(options: SchedulerOptions): Fresh
     if (
       input.fetchRuleSignature !== input.currentRuleSignature ||
       input.fetchQuoteSymbolSignature !== input.currentQuoteSymbolSignature ||
-      input.rules.length === 0
+      (input.rules.length === 0 && input.integerRules.length === 0)
     ) {
       return;
     }
 
     queuedInput = {
       rules: input.rules,
+      integerRules: input.integerRules,
       quotes: input.quotes,
       now: input.now,
+      integerAlertCooldownMs: input.integerAlertCooldownMs,
     };
 
     if (!inFlight) {
@@ -74,6 +78,10 @@ export function createFreshQuoteAlertScheduler(options: SchedulerOptions): Fresh
 
 export function createAlertRuleSignature(rules: AlertRule[]): string {
   return rules.map((rule) => `${rule.symbol}:${rule.thresholdPercent}:${rule.enabled ? "1" : "0"}`).join("|");
+}
+
+export function createIntegerAlertRuleSignature(rules: IntegerAlertRule[]): string {
+  return rules.map((rule) => `${rule.symbol}:${rule.step}:${rule.enabled ? "1" : "0"}`).join("|");
 }
 
 export function createQuoteSymbolSignature(symbols: string[]): string {

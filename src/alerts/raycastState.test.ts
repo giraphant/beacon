@@ -1,5 +1,5 @@
 import { LocalStorage } from "@raycast/api";
-import { getAlertState, saveAlertState } from "#/alerts/raycastState";
+import { getAlertState, saveAlertState, getIntegerAlertState, saveIntegerAlertState } from "#/alerts/raycastState";
 
 jest.mock(
   "@raycast/api",
@@ -74,4 +74,47 @@ test("returns undefined when stored alert state belongs to a different symbol", 
   mockedLocalStorage.getItem.mockResolvedValueOnce(JSON.stringify({ symbol: "ETH", lastBaselinePrice: 100 }));
 
   await expect(getAlertState("BTC", 1)).resolves.toBeUndefined();
+});
+
+test("returns parsed integer alert state from namespaced LocalStorage key", async () => {
+  mockedLocalStorage.getItem.mockResolvedValueOnce(
+    JSON.stringify({
+      symbol: "BTC",
+      lastBucket: 65,
+      lastPrice: 65_820,
+      lastTriggeredAt: 123,
+      lastTriggeredPrice: 66_120,
+      lastTriggeredBoundaryRanges: [{ startBucket: 66, endBucket: 66, triggeredAt: 123 }],
+    })
+  );
+
+  await expect(getIntegerAlertState("BTC", 1000)).resolves.toEqual({
+    symbol: "BTC",
+    lastBucket: 65,
+    lastPrice: 65_820,
+    lastTriggeredAt: 123,
+    lastTriggeredPrice: 66_120,
+    lastTriggeredBoundaryRanges: [{ startBucket: 66, endBucket: 66, triggeredAt: 123 }],
+  });
+  expect(mockedLocalStorage.getItem).toHaveBeenCalledWith("integer-alert-state:BTC:1000");
+});
+
+test("saves serialized integer alert state under namespaced LocalStorage key", async () => {
+  await saveIntegerAlertState({ symbol: "SOL", lastBucket: 14, lastPrice: 72 }, 5);
+
+  expect(mockedLocalStorage.setItem).toHaveBeenCalledWith(
+    "integer-alert-state:SOL:5",
+    JSON.stringify({ symbol: "SOL", lastBucket: 14, lastPrice: 72 })
+  );
+});
+
+test("returns undefined for malformed integer alert state JSON", async () => {
+  mockedLocalStorage.getItem
+    .mockResolvedValueOnce(JSON.stringify({ symbol: "BTC", lastBucket: 65 }))
+    .mockResolvedValueOnce(JSON.stringify({ symbol: "BTC", lastBucket: "65", lastPrice: 65_820 }))
+    .mockResolvedValueOnce(JSON.stringify({ symbol: "ETH", lastBucket: 65, lastPrice: 65_820 }));
+
+  await expect(getIntegerAlertState("BTC", 1000)).resolves.toBeUndefined();
+  await expect(getIntegerAlertState("BTC", 1000)).resolves.toBeUndefined();
+  await expect(getIntegerAlertState("BTC", 1000)).resolves.toBeUndefined();
 });

@@ -20,6 +20,7 @@ export type BuildMenuBarModelInput = {
   hideCurrencySymbol?: boolean;
   quoteResult: QuoteFetchResult | undefined;
   invalidRuleTokens: string[];
+  invalidIntegerRuleTokens?: string[];
   recentAlerts?: RecentAlertsBySymbol;
   isLoading: boolean;
   now: number;
@@ -71,11 +72,15 @@ export function buildMenuBarModel(input: BuildMenuBarModelInput): MenuBarModel {
     }
   }
 
-  if (input.invalidRuleTokens.length > 0) {
-    sections.push({
-      title: "Configuration",
-      items: [{ title: `Ignored rules: ${input.invalidRuleTokens.join(", ")}` }],
-    });
+  const configurationItems = [
+    input.invalidRuleTokens.length > 0 ? { title: `Ignored rules: ${input.invalidRuleTokens.join(", ")}` } : undefined,
+    input.invalidIntegerRuleTokens && input.invalidIntegerRuleTokens.length > 0
+      ? { title: `Ignored integer rules: ${input.invalidIntegerRuleTokens.join(", ")}` }
+      : undefined,
+  ].filter((item): item is MenuItemModel => Boolean(item));
+
+  if (configurationItems.length > 0) {
+    sections.push({ title: "Configuration", items: configurationItems });
   }
 
   return { title, isLoading, items, sections };

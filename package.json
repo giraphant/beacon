@@ -73,6 +73,24 @@
       "required": false
     },
     {
+      "title": "Integer Alert Rules",
+      "name": "integerAlertRules",
+      "description": "Price-level alerts. Format: SYMBOL:STEP, for example BTC:1000 alerts when BTC crosses each $1000 boundary.",
+      "type": "textfield",
+      "placeholder": "BTC:1000 SOL:5 JUP:0.05",
+      "default": "",
+      "required": false
+    },
+    {
+      "title": "Integer Alert Cooldown Minutes",
+      "name": "integerAlertCooldownMinutes",
+      "description": "Suppress repeated notifications for the same integer boundary per coin and step. Set 0 to disable.",
+      "type": "textfield",
+      "placeholder": "10",
+      "default": "10",
+      "required": false
+    },
+    {
       "title": "Alert Sound",
       "name": "alertSoundEnabled",
       "label": "Play sound on price alerts",

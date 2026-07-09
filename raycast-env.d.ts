@@ -18,6 +18,10 @@ type ExtensionPreferences = {
   "source": "Bybit" | "Binance",
   /** Alert Rules - Looping percent alerts. Format: SYMBOL:PERCENT, for example BTC:1 means alert every 1% move from the last alert price. */
   "alertRules": string,
+  /** Integer Alert Rules - Price-level alerts. Format: SYMBOL:STEP, for example BTC:1000 alerts when BTC crosses each $1000 boundary. */
+  "integerAlertRules": string,
+  /** Integer Alert Cooldown Minutes - Suppress repeated notifications for the same integer boundary per coin and step. Set 0 to disable. */
+  "integerAlertCooldownMinutes": string,
   /** Alert Sound - Play a short sound when Beacon shows a price alert HUD and toast */
   "alertSoundEnabled": boolean
 }
