@@ -1,0 +1,14 @@
+services:
+  relay:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    expose:
+      - "18765"
+    environment:
+      RELAY_TOKEN: "${RELAY_TOKEN:?RELAY_TOKEN is required}"
+      SOURCES: "${SOURCES:-bybit-linear,binance-futures,binance-spot}"
+      LISTEN_ADDR: ":18765"
+    cpus: 0.5
+    mem_limit: 128m
