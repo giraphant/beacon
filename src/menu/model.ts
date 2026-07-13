@@ -1,5 +1,5 @@
 import type { Quote } from "#/types";
-import type { QuoteFetchResult } from "#/quotes/fallback";
+import type { QuoteFetchResult } from "#/quotes/relay";
 import type { RecentAlertsBySymbol } from "#/alerts/recentAlertState";
 import { getRecentAlertIndicator } from "#/alerts/recentAlertState";
 import { formatAge, formatPrice } from "#/utils/format";
@@ -52,6 +52,7 @@ export function buildMenuBarModel(input: BuildMenuBarModelInput): MenuBarModel {
   const sections: MenuSectionModel[] = [];
 
   const sourceLine = buildSourceLine(displayQuotes);
+  const staleSymbols = displayQuotes.filter((quote) => quote.stale).map((quote) => quote.symbol);
 
   if (input.quoteResult) {
     const statusItems = [
@@ -62,6 +63,7 @@ export function buildMenuBarModel(input: BuildMenuBarModelInput): MenuBarModel {
       input.quoteResult.missingSymbols.length > 0
         ? { title: `Not found: ${input.quoteResult.missingSymbols.join(", ")}` }
         : undefined,
+      staleSymbols.length > 0 ? { title: `Stale: ${staleSymbols.join(", ")}` } : undefined,
       input.quoteResult.errors.length > 0
         ? { title: `Refresh issues: ${input.quoteResult.errors.join("; ")}` }
         : undefined,

@@ -7,6 +7,7 @@ export type Quote = {
   high24h?: number;
   low24h?: number;
   change24h?: number;
+  stale?: boolean;
 };
 
 export type AlertRule = {

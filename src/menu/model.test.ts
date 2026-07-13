@@ -94,6 +94,29 @@ describe("buildMenuBarModel", () => {
     expect(statusText).toContain("Source: Bybit, Binance");
   });
 
+  it("keeps stale prices visible and lists their symbols in status", () => {
+    const model = buildMenuBarModel({
+      displaySymbols: ["BTC", "ETH"],
+      quoteResult: {
+        quotes: {
+          BTC: quote("BTC", 100),
+          ETH: { ...quote("ETH", 200), stale: true },
+        },
+        missingSymbols: [],
+        errors: [],
+        updatedAt: 1_000,
+      },
+      invalidRuleTokens: [],
+      isLoading: false,
+      now: 12_000,
+    });
+
+    expect(model.title).toBe("BTC $100.00 · ETH $200.00");
+    const statusText = model.sections.flatMap((section) => section.items.map((item) => item.title)).join("\n");
+    expect(statusText).toContain("Stale: ETH");
+    expect(statusText).not.toContain("Stale: BTC");
+  });
+
   it("returns a 'No symbols' title when displaySymbols is empty", () => {
     const model = buildMenuBarModel({
       displaySymbols: [],
