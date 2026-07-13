@@ -115,6 +115,34 @@ describe("fresh quote alert scheduler", () => {
     expect(processedRules[0]).toEqual([btcRule]);
   });
 
+  test("excludes stale quotes from alert runs without mutating the result", async () => {
+    const processed: Array<Record<string, Quote>> = [];
+    const quotes = {
+      BTC: quote("BTC", 100, 1),
+      ETH: { ...quote("ETH", 200, 1), stale: true },
+    };
+    const scheduler = createFreshQuoteAlertScheduler({
+      runAlerts: async ({ quotes: freshQuotes }) => {
+        processed.push(freshQuotes);
+      },
+    });
+
+    scheduler.submitFreshQuoteResult({
+      quotes,
+      rules: [btcRule, ethRule],
+      integerRules: [],
+      fetchRuleSignature: "BTC:2|ETH:1",
+      currentRuleSignature: "BTC:2|ETH:1",
+      fetchQuoteSymbolSignature: "BTC|ETH",
+      currentQuoteSymbolSignature: "BTC|ETH",
+      now: 10,
+    });
+    await scheduler.waitForIdle();
+
+    expect(Object.keys(processed[0])).toEqual(["BTC"]);
+    expect(quotes.ETH.stale).toBe(true);
+  });
+
   test("creates a stable integer alert rule signature", () => {
     expect(createIntegerAlertRuleSignature([btcIntegerRule, { symbol: "SOL", step: 5, enabled: false }])).toBe(
       "BTC:1000:1|SOL:5:0"

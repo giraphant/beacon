@@ -161,11 +161,11 @@ Catalogs refresh every six hours. Failed refreshes preserve the last successful 
 
 All state is in memory. Restarting clears quotes and subscriptions; the next client request establishes them again.
 
-## Future Raycast integration
+## Raycast integration
 
-The later Beacon client change needs two password/preferences fields:
+The Beacon command uses two preferences:
 
 - Relay URL, such as `https://relay.example.com`
 - Relay token, stored as a Raycast password preference
 
-The client should call `/v1/quotes` once per 30-second refresh with a three-second timeout and keep its existing local display cache when the relay is temporarily unavailable.
+The client calls `/v1/quotes` once per 30-second refresh with a three-second timeout. It keeps its existing local display cache when the relay is temporarily unavailable and does not fall back to direct exchange requests.

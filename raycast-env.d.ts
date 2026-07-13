@@ -14,8 +14,10 @@ type ExtensionPreferences = {
   "hideMenuBarSymbols": boolean,
   /** Currency Symbol - Show prices without $ in the menu bar and dropdown */
   "hideCurrencySymbol": boolean,
-  /** Preferred Source - Preferred source; Beacon falls back to the other source when needed */
-  "source": "Bybit" | "Binance",
+  /** Relay URL - HTTPS base URL for the Beacon quote relay */
+  "relayUrl": string,
+  /** Relay Token - Bearer token configured on the Beacon quote relay */
+  "relayToken": string,
   /** Alert Rules - Looping percent alerts. Format: SYMBOL:PERCENT, for example BTC:1 means alert every 1% move from the last alert price. */
   "alertRules": string,
   /** Integer Alert Rules - Price-level alerts. Format: SYMBOL:STEP, for example BTC:1000 alerts when BTC crosses each $1000 boundary. */

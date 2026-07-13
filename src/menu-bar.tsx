@@ -19,7 +19,7 @@ import {
   parseIntegerAlertRulesText,
 } from "#/config/preferences";
 import { buildMenuBarModel } from "#/menu/model";
-import { fetchQuotesWithFallback, type PreferredQuoteSource, type QuoteFetchResult } from "#/quotes/fallback";
+import { fetchRelayQuotes, type QuoteFetchResult } from "#/quotes/relay";
 
 type MenuBarPreferences = {
   coins?: string;
@@ -28,7 +28,8 @@ type MenuBarPreferences = {
   integerAlertCooldownMinutes?: string;
   hideMenuBarSymbols?: boolean;
   hideCurrencySymbol?: boolean;
-  source?: PreferredQuoteSource;
+  relayUrl?: string;
+  relayToken?: string;
 };
 
 type TaggedQuoteFetchResult = {
@@ -41,10 +42,11 @@ async function fetchTaggedQuotes(
   symbols: string[],
   ruleSignature: string,
   quoteSymbolSignature: string,
-  preferredSource: PreferredQuoteSource | undefined
+  relayUrl: string | undefined,
+  relayToken: string | undefined
 ): Promise<TaggedQuoteFetchResult> {
   return {
-    result: await fetchQuotesWithFallback(symbols, preferredSource),
+    result: await fetchRelayQuotes(symbols, relayUrl, relayToken),
     ruleSignature,
     quoteSymbolSignature,
   };
@@ -78,10 +80,10 @@ export default function Command() {
       ),
     [parsedRules.rules, parsedIntegerRules.rules]
   );
-  const preferredSource = preferences.source ?? "Bybit";
+  const relayUrl = preferences.relayUrl?.trim() ?? "";
   const quoteSymbolSignature = useMemo(
-    () => `${preferredSource}:${createQuoteSymbolSignature(quoteSymbols)}`,
-    [preferredSource, quoteSymbols]
+    () => `${relayUrl}:${createQuoteSymbolSignature(quoteSymbols)}`,
+    [relayUrl, quoteSymbols]
   );
   const [recentAlerts, setRecentAlerts] = useCachedState<RecentAlertsBySymbol>(RECENT_ALERTS_CACHE_KEY, {});
   const alertScheduler = useMemo(
@@ -118,7 +120,7 @@ export default function Command() {
   const [cachedQuotes, setCachedQuotes] = useCachedState<QuoteFetchResult | undefined>("quote-cache", undefined);
   const { data, isLoading, error } = usePromise(
     fetchTaggedQuotes,
-    [quoteSymbols, ruleSignature, quoteSymbolSignature, preferredSource],
+    [quoteSymbols, ruleSignature, quoteSymbolSignature, relayUrl, preferences.relayToken],
     {
       execute: quoteSymbols.length > 0,
       onData: ({ result }) => setCachedQuotes(result),
@@ -126,7 +128,13 @@ export default function Command() {
     }
   );
 
-  const quoteResult = data?.result ?? cachedQuotes;
+  const quoteResult =
+    data?.result ??
+    (error
+      ? cachedQuotes
+        ? { ...cachedQuotes, errors: [error.message] }
+        : { quotes: {}, missingSymbols: [], errors: [error.message], updatedAt: 0 }
+      : cachedQuotes);
 
   useEffect(() => {
     if (!data) {
@@ -159,7 +167,7 @@ export default function Command() {
     titleSymbols,
     hideTitleSymbols: preferences.hideMenuBarSymbols ?? false,
     hideCurrencySymbol: preferences.hideCurrencySymbol ?? false,
-    quoteResult: error && cachedQuotes ? { ...cachedQuotes, errors: [error.message] } : quoteResult,
+    quoteResult,
     invalidRuleTokens: parsedRules.invalidTokens,
     invalidIntegerRuleTokens: parsedIntegerRules.invalidTokens,
     recentAlerts,

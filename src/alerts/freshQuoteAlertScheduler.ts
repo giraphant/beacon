@@ -37,10 +37,11 @@ export function createFreshQuoteAlertScheduler(options: SchedulerOptions): Fresh
       return;
     }
 
+    const freshQuotes = Object.fromEntries(Object.entries(input.quotes).filter(([, quote]) => !quote.stale));
     queuedInput = {
       rules: input.rules,
       integerRules: input.integerRules,
-      quotes: input.quotes,
+      quotes: freshQuotes,
       now: input.now,
       integerAlertCooldownMs: input.integerAlertCooldownMs,
     };
