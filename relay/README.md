@@ -50,6 +50,12 @@ docker run --rm \
 
 The container runs as a non-root user and serves plain HTTP on port 18765. Put it behind HTTPS before exposing it outside the local machine.
 
+## Paste directly into Coolify
+
+`Dockerfile.coolify` is standalone: it clones the public Beacon repository and builds the relay without requiring repository files in the Docker build context. Copy that file verbatim into a Dockerfile-based Coolify resource, set `RELAY_TOKEN`, expose container port `18765`, and attach an HTTPS domain.
+
+The optional `BEACON_REF` build argument defaults to `main` and may be set to a branch or tag. The image includes a `/healthz` Docker health check.
+
 ## Run from source
 
 ```bash
