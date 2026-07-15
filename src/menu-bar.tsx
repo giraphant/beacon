@@ -18,7 +18,7 @@ import {
   parseIntegerAlertCooldownMinutes,
   parseIntegerAlertRulesText,
 } from "#/config/preferences";
-import { buildMenuBarModel } from "#/menu/model";
+import { buildMenuBarModel, resolveActiveQuoteResult } from "#/menu/model";
 import { createQuoteSourceSignature, fetchQuotesForSource, type QuoteSource } from "#/quotes/source";
 import type { QuoteFetchResult } from "#/quotes/types";
 import { createTaggedQuoteCacheEntry, readTaggedQuoteCache, type TaggedQuoteCacheEntry } from "#/quotes/quoteCache";
@@ -139,13 +139,12 @@ export default function Command() {
   );
 
   const cachedResult = readTaggedQuoteCache(cachedQuotes, quoteSourceSignature);
-  const quoteResult =
-    data?.result ??
-    (error
-      ? cachedResult
-        ? { ...cachedResult, errors: [...cachedResult.errors, error.message] }
-        : { quotes: {}, missingSymbols: [], errors: [error.message], updatedAt: 0 }
-      : cachedResult);
+  const quoteResult = resolveActiveQuoteResult({
+    data: data ? { result: data.result, sourceSignature: data.sourceSignature } : undefined,
+    activeSourceSignature: quoteSourceSignature,
+    error: error ?? undefined,
+    cachedResult,
+  });
 
   useEffect(() => {
     if (!data) {

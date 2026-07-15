@@ -1,6 +1,7 @@
 import type { Quote } from "#/types";
+import type { QuoteFetchResult } from "#/quotes/types";
 import type { RecentAlertsBySymbol } from "#/alerts/recentAlertState";
-import { buildMenuBarModel } from "./model";
+import { buildMenuBarModel, resolveActiveQuoteResult } from "./model";
 
 const quote = (symbol: string, price: number): Quote => ({
   symbol,
@@ -236,4 +237,46 @@ it("marks quotes with recent alert direction and shows a recent alerts section",
   expect(model.title).toBe("BTC $101.00");
   expect(model.items.map((item) => item.title)).toEqual(["🔴 QQQ: $396.00"]);
   expect(model.sections[0].title).toBe("Status");
+});
+
+describe("resolveActiveQuoteResult", () => {
+  const bybitResult: QuoteFetchResult = {
+    quotes: { BTC: { symbol: "BTC", name: "Bitcoin", price: 100, source: "Bybit", updatedAt: 1_000 } },
+    missingSymbols: [],
+    errors: [],
+    updatedAt: 1_000,
+  };
+
+  it("accepts a result tagged Bybit when active source is Bybit", () => {
+    expect(
+      resolveActiveQuoteResult({
+        data: { result: bybitResult, sourceSignature: "Bybit" },
+        activeSourceSignature: "Bybit",
+        error: undefined,
+        cachedResult: undefined,
+      })
+    ).toBe(bybitResult);
+  });
+
+  it("rejects a result tagged Bybit when active source is Relay", () => {
+    expect(
+      resolveActiveQuoteResult({
+        data: { result: bybitResult, sourceSignature: "Bybit" },
+        activeSourceSignature: "Relay:https://relay.example.com",
+        error: undefined,
+        cachedResult: undefined,
+      })
+    ).toBeUndefined();
+  });
+
+  it("falls back to cached result when data is stale and there is no error", () => {
+    expect(
+      resolveActiveQuoteResult({
+        data: { result: bybitResult, sourceSignature: "Bybit" },
+        activeSourceSignature: "Relay:https://relay.example.com",
+        error: undefined,
+        cachedResult: bybitResult,
+      })
+    ).toBe(bybitResult);
+  });
 });

@@ -13,6 +13,32 @@ export type MenuBarModel = {
   sections: MenuSectionModel[];
 };
 
+export type ActiveQuoteData = {
+  result: QuoteFetchResult;
+  sourceSignature: string;
+};
+
+export type ResolveActiveQuoteResultInput = {
+  data: ActiveQuoteData | undefined;
+  activeSourceSignature: string;
+  error: Error | undefined;
+  cachedResult: QuoteFetchResult | undefined;
+};
+
+export function resolveActiveQuoteResult(input: ResolveActiveQuoteResultInput): QuoteFetchResult | undefined {
+  const activeData =
+    input.data && input.data.sourceSignature === input.activeSourceSignature ? input.data.result : undefined;
+  if (activeData) {
+    return activeData;
+  }
+  if (input.error) {
+    return input.cachedResult
+      ? { ...input.cachedResult, errors: [...input.cachedResult.errors, input.error.message] }
+      : { quotes: {}, missingSymbols: [], errors: [input.error.message], updatedAt: 0 };
+  }
+  return input.cachedResult;
+}
+
 export type BuildMenuBarModelInput = {
   displaySymbols: string[];
   titleSymbols?: string[];

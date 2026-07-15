@@ -30,4 +30,115 @@ describe("readTaggedQuoteCache", () => {
     expect(readTaggedQuoteCache({ foo: "bar" }, "Bybit")).toBeUndefined();
     expect(readTaggedQuoteCache({ sourceSignature: "Bybit" }, "Bybit")).toBeUndefined();
   });
+
+  it("returns undefined when the nested result envelope is empty or missing required fields", () => {
+    expect(readTaggedQuoteCache({ sourceSignature: "Bybit", result: {} }, "Bybit")).toBeUndefined();
+    expect(
+      readTaggedQuoteCache(
+        { sourceSignature: "Bybit", result: { quotes: {}, missingSymbols: [], errors: [] } },
+        "Bybit"
+      )
+    ).toBeUndefined();
+    expect(
+      readTaggedQuoteCache(
+        {
+          sourceSignature: "Bybit",
+          result: { quotes: "not-object", missingSymbols: [], errors: [], updatedAt: 1 },
+        },
+        "Bybit"
+      )
+    ).toBeUndefined();
+    expect(
+      readTaggedQuoteCache(
+        {
+          sourceSignature: "Bybit",
+          result: { quotes: {}, missingSymbols: "not-array", errors: [], updatedAt: 1 },
+        },
+        "Bybit"
+      )
+    ).toBeUndefined();
+    expect(
+      readTaggedQuoteCache(
+        {
+          sourceSignature: "Bybit",
+          result: { quotes: {}, missingSymbols: [], errors: [123], updatedAt: 1 },
+        },
+        "Bybit"
+      )
+    ).toBeUndefined();
+    expect(
+      readTaggedQuoteCache(
+        {
+          sourceSignature: "Bybit",
+          result: { quotes: {}, missingSymbols: [], errors: [], updatedAt: -1 },
+        },
+        "Bybit"
+      )
+    ).toBeUndefined();
+    expect(
+      readTaggedQuoteCache(
+        {
+          sourceSignature: "Bybit",
+          result: { quotes: {}, missingSymbols: [], errors: [], updatedAt: Infinity },
+        },
+        "Bybit"
+      )
+    ).toBeUndefined();
+  });
+
+  it("returns undefined when the nested result contains a malformed quote", () => {
+    expect(
+      readTaggedQuoteCache(
+        {
+          sourceSignature: "Bybit",
+          result: {
+            quotes: { BTC: { symbol: "", name: "Bitcoin", price: 100, source: "Bybit", updatedAt: 1 } },
+            missingSymbols: [],
+            errors: [],
+            updatedAt: 1,
+          },
+        },
+        "Bybit"
+      )
+    ).toBeUndefined();
+
+    expect(
+      readTaggedQuoteCache(
+        {
+          sourceSignature: "Bybit",
+          result: {
+            quotes: { BTC: { symbol: "BTC", name: "Bitcoin", price: -5, source: "Bybit", updatedAt: 1 } },
+            missingSymbols: [],
+            errors: [],
+            updatedAt: 1,
+          },
+        },
+        "Bybit"
+      )
+    ).toBeUndefined();
+
+    expect(
+      readTaggedQuoteCache(
+        {
+          sourceSignature: "Bybit",
+          result: {
+            quotes: {
+              BTC: {
+                symbol: "BTC",
+                name: "Bitcoin",
+                price: 100,
+                source: "Bybit",
+                updatedAt: 1,
+                high24h: "not-a-number",
+              },
+            },
+            missingSymbols: [],
+            errors: [],
+            updatedAt: 1,
+          },
+        },
+        "Bybit"
+      )
+    ).toBeUndefined();
+  });
 });

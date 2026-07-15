@@ -2,7 +2,7 @@ import { getInstrumentName } from "#/constants";
 import type { Quote } from "#/types";
 import { fetchJsonWithRetry } from "./fetchWithRetry";
 
-const SPOT_TICKER_URL = "https://api.binance.com/api/v3/ticker/24hr";
+const SPOT_TICKER_URL = "https://api.binance.com/api/v3/ticker/24hr?type=MINI";
 
 type BinanceTicker = {
   symbol: string;
@@ -12,7 +12,7 @@ type BinanceTicker = {
 };
 
 export async function fetchBinanceSpotQuotes(symbols: string[]): Promise<Record<string, Quote>> {
-  const data = await fetchJsonWithRetry<unknown>(getTickersUrl(symbols), {
+  const data = await fetchJsonWithRetry<unknown>(SPOT_TICKER_URL, {
     attempts: 1,
     timeoutMs: 3500,
     useCurl: true,
@@ -65,9 +65,4 @@ function isBinanceTicker(value: unknown): value is BinanceTicker {
     typeof ticker.highPrice === "string" &&
     typeof ticker.lowPrice === "string"
   );
-}
-
-function getTickersUrl(symbols: string[]) {
-  const pairSymbols = JSON.stringify(symbols.map((symbol) => `${symbol}USDT`));
-  return `${SPOT_TICKER_URL}?symbols=${encodeURIComponent(pairSymbols)}&type=MINI`;
 }
