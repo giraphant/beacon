@@ -1,5 +1,5 @@
 import type { Quote } from "#/types";
-import type { QuoteFetchResult } from "#/quotes/relay";
+import type { QuoteFetchResult } from "#/quotes/types";
 import type { RecentAlertsBySymbol } from "#/alerts/recentAlertState";
 import { getRecentAlertIndicator } from "#/alerts/recentAlertState";
 import { formatAge, formatPrice } from "#/utils/format";
