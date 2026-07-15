@@ -18,7 +18,7 @@ export async function fetchBinanceSpotQuotes(symbols: string[]): Promise<Record<
     useCurl: true,
   });
   if (!Array.isArray(data)) {
-    return {};
+    throw new Error("Binance returned an invalid response");
   }
 
   const targetSymbols = new Set(symbols.map((symbol) => `${symbol}USDT`));

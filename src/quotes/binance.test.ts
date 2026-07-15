@@ -57,4 +57,10 @@ describe("fetchBinanceSpotQuotes", () => {
       updatedAt: 1234,
     });
   });
+
+  it("rejects a non-array HTTP-200 body as invalid", async () => {
+    mockedFetchJsonWithRetry.mockResolvedValueOnce({ code: -1121, msg: "Invalid symbol" } as never);
+
+    await expect(fetchBinanceSpotQuotes(["BTC"])).rejects.toThrow("Binance returned an invalid response");
+  });
 });

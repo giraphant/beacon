@@ -279,4 +279,37 @@ describe("resolveActiveQuoteResult", () => {
       })
     ).toBe(bybitResult);
   });
+
+  it("ignores an error whose signature does not match the active source", () => {
+    expect(
+      resolveActiveQuoteResult({
+        data: undefined,
+        activeSourceSignature: "Relay:https://relay.example.com",
+        error: { message: "Bybit timeout", sourceSignature: "Bybit" },
+        cachedResult: bybitResult,
+      })
+    ).toBe(bybitResult);
+  });
+
+  it("appends a matching-signature error to cached result errors", () => {
+    expect(
+      resolveActiveQuoteResult({
+        data: undefined,
+        activeSourceSignature: "Bybit",
+        error: { message: "Bybit timeout", sourceSignature: "Bybit" },
+        cachedResult: bybitResult,
+      })
+    ).toEqual({ ...bybitResult, errors: ["Bybit timeout"] });
+  });
+
+  it("creates an error-only result when matching-signature error has no cache", () => {
+    expect(
+      resolveActiveQuoteResult({
+        data: undefined,
+        activeSourceSignature: "Bybit",
+        error: { message: "Bybit timeout", sourceSignature: "Bybit" },
+        cachedResult: undefined,
+      })
+    ).toEqual({ quotes: {}, missingSymbols: [], errors: ["Bybit timeout"], updatedAt: 0 });
+  });
 });

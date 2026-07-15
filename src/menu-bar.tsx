@@ -18,7 +18,7 @@ import {
   parseIntegerAlertCooldownMinutes,
   parseIntegerAlertRulesText,
 } from "#/config/preferences";
-import { buildMenuBarModel, resolveActiveQuoteResult } from "#/menu/model";
+import { buildMenuBarModel, resolveActiveQuoteResult, type SourceError } from "#/menu/model";
 import { createQuoteSourceSignature, fetchQuotesForSource, type QuoteSource } from "#/quotes/source";
 import type { QuoteFetchResult } from "#/quotes/types";
 import { createTaggedQuoteCacheEntry, readTaggedQuoteCache, type TaggedQuoteCacheEntry } from "#/quotes/quoteCache";
@@ -42,6 +42,16 @@ type TaggedQuoteFetchResult = {
   sourceSignature: string;
 };
 
+class TaggedQuoteFetchError extends Error {
+  constructor(message: string, readonly sourceSignature: string) {
+    super(message);
+  }
+}
+
+function isSourceError(error: unknown): error is SourceError {
+  return error instanceof Error && "sourceSignature" in error && typeof error.sourceSignature === "string";
+}
+
 async function fetchTaggedQuotes(
   symbols: string[],
   ruleSignature: string,
@@ -50,13 +60,14 @@ async function fetchTaggedQuotes(
   relayUrl: string | undefined,
   relayToken: string | undefined
 ): Promise<TaggedQuoteFetchResult> {
-  const result = await fetchQuotesForSource(symbols, source, relayUrl, relayToken);
-  return {
-    result,
-    ruleSignature,
-    quoteSymbolSignature,
-    sourceSignature: createQuoteSourceSignature(source, relayUrl),
-  };
+  const sourceSignature = createQuoteSourceSignature(source, relayUrl);
+  try {
+    const result = await fetchQuotesForSource(symbols, source, relayUrl, relayToken);
+    return { result, ruleSignature, quoteSymbolSignature, sourceSignature };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new TaggedQuoteFetchError(message, sourceSignature);
+  }
 }
 
 export default function Command() {
@@ -139,10 +150,11 @@ export default function Command() {
   );
 
   const cachedResult = readTaggedQuoteCache(cachedQuotes, quoteSourceSignature);
+  const sourceError = isSourceError(error) ? error : undefined;
   const quoteResult = resolveActiveQuoteResult({
     data: data ? { result: data.result, sourceSignature: data.sourceSignature } : undefined,
     activeSourceSignature: quoteSourceSignature,
-    error: error ?? undefined,
+    error: sourceError,
     cachedResult,
   });
 

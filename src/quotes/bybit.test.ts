@@ -40,4 +40,34 @@ describe("fetchBybitLinearQuotes", () => {
       },
     });
   });
+
+  it("accepts a valid empty list array", async () => {
+    mockedFetchJsonWithRetry.mockResolvedValueOnce({ retCode: 0, result: { list: [] } } as never);
+
+    await expect(fetchBybitLinearQuotes(["BTC"])).resolves.toEqual({});
+  });
+
+  it("rejects retCode 0 with missing result", async () => {
+    mockedFetchJsonWithRetry.mockResolvedValueOnce({ retCode: 0 } as never);
+
+    await expect(fetchBybitLinearQuotes(["BTC"])).rejects.toThrow("Bybit returned an invalid response");
+  });
+
+  it("rejects retCode 0 with missing list", async () => {
+    mockedFetchJsonWithRetry.mockResolvedValueOnce({ retCode: 0, result: {} } as never);
+
+    await expect(fetchBybitLinearQuotes(["BTC"])).rejects.toThrow("Bybit returned an invalid response");
+  });
+
+  it("rejects retCode 0 with non-array list", async () => {
+    mockedFetchJsonWithRetry.mockResolvedValueOnce({ retCode: 0, result: { list: "not-array" } } as never);
+
+    await expect(fetchBybitLinearQuotes(["BTC"])).rejects.toThrow("Bybit returned an invalid response");
+  });
+
+  it("still throws on non-zero retCode", async () => {
+    mockedFetchJsonWithRetry.mockResolvedValueOnce({ retCode: 10001, retMsg: "params error" } as never);
+
+    await expect(fetchBybitLinearQuotes(["BTC"])).rejects.toThrow("params error");
+  });
 });

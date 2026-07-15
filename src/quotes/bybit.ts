@@ -29,7 +29,10 @@ export async function fetchBybitLinearQuotes(symbols: string[]): Promise<Record<
 
   const targetSymbols = new Set(symbols.map((symbol) => `${symbol}USDT`));
   const result = data.result;
-  const list = result && Array.isArray(result.list) ? result.list : [];
+  if (!result || !Array.isArray(result.list)) {
+    throw new Error("Bybit returned an invalid response");
+  }
+  const list = result.list;
   const updatedAt = Date.now();
   const quotes: Record<string, Quote> = {};
 

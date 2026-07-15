@@ -18,10 +18,15 @@ export type ActiveQuoteData = {
   sourceSignature: string;
 };
 
+export type SourceError = {
+  message: string;
+  sourceSignature: string;
+};
+
 export type ResolveActiveQuoteResultInput = {
   data: ActiveQuoteData | undefined;
   activeSourceSignature: string;
-  error: Error | undefined;
+  error: SourceError | undefined;
   cachedResult: QuoteFetchResult | undefined;
 };
 
@@ -31,7 +36,7 @@ export function resolveActiveQuoteResult(input: ResolveActiveQuoteResultInput): 
   if (activeData) {
     return activeData;
   }
-  if (input.error) {
+  if (input.error && input.error.sourceSignature === input.activeSourceSignature) {
     return input.cachedResult
       ? { ...input.cachedResult, errors: [...input.cachedResult.errors, input.error.message] }
       : { quotes: {}, missingSymbols: [], errors: [input.error.message], updatedAt: 0 };
