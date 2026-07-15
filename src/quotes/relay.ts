@@ -1,14 +1,9 @@
 import { getInstrumentName } from "#/constants";
 import type { Quote } from "#/types";
+import type { QuoteFetchResult } from "#/quotes/types";
+export type { QuoteFetchResult } from "#/quotes/types";
 
 const REQUEST_TIMEOUT_MS = 3_000;
-
-export type QuoteFetchResult = {
-  quotes: Record<string, Quote>;
-  missingSymbols: string[];
-  errors: string[];
-  updatedAt: number;
-};
 
 type RelayQuote = {
   price: number;

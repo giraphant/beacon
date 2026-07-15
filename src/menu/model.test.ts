@@ -1,6 +1,7 @@
 import type { Quote } from "#/types";
+import type { QuoteFetchResult } from "#/quotes/types";
 import type { RecentAlertsBySymbol } from "#/alerts/recentAlertState";
-import { buildMenuBarModel } from "./model";
+import { buildMenuBarModel, resolveActiveQuoteResult } from "./model";
 
 const quote = (symbol: string, price: number): Quote => ({
   symbol,
@@ -236,4 +237,79 @@ it("marks quotes with recent alert direction and shows a recent alerts section",
   expect(model.title).toBe("BTC $101.00");
   expect(model.items.map((item) => item.title)).toEqual(["🔴 QQQ: $396.00"]);
   expect(model.sections[0].title).toBe("Status");
+});
+
+describe("resolveActiveQuoteResult", () => {
+  const bybitResult: QuoteFetchResult = {
+    quotes: { BTC: { symbol: "BTC", name: "Bitcoin", price: 100, source: "Bybit", updatedAt: 1_000 } },
+    missingSymbols: [],
+    errors: [],
+    updatedAt: 1_000,
+  };
+
+  it("accepts a result tagged Bybit when active source is Bybit", () => {
+    expect(
+      resolveActiveQuoteResult({
+        data: { result: bybitResult, sourceSignature: "Bybit" },
+        activeSourceSignature: "Bybit",
+        error: undefined,
+        cachedResult: undefined,
+      })
+    ).toBe(bybitResult);
+  });
+
+  it("rejects a result tagged Bybit when active source is Relay", () => {
+    expect(
+      resolveActiveQuoteResult({
+        data: { result: bybitResult, sourceSignature: "Bybit" },
+        activeSourceSignature: "Relay:https://relay.example.com",
+        error: undefined,
+        cachedResult: undefined,
+      })
+    ).toBeUndefined();
+  });
+
+  it("falls back to cached result when data is stale and there is no error", () => {
+    expect(
+      resolveActiveQuoteResult({
+        data: { result: bybitResult, sourceSignature: "Bybit" },
+        activeSourceSignature: "Relay:https://relay.example.com",
+        error: undefined,
+        cachedResult: bybitResult,
+      })
+    ).toBe(bybitResult);
+  });
+
+  it("ignores an error whose signature does not match the active source", () => {
+    expect(
+      resolveActiveQuoteResult({
+        data: undefined,
+        activeSourceSignature: "Relay:https://relay.example.com",
+        error: { message: "Bybit timeout", sourceSignature: "Bybit" },
+        cachedResult: bybitResult,
+      })
+    ).toBe(bybitResult);
+  });
+
+  it("appends a matching-signature error to cached result errors", () => {
+    expect(
+      resolveActiveQuoteResult({
+        data: undefined,
+        activeSourceSignature: "Bybit",
+        error: { message: "Bybit timeout", sourceSignature: "Bybit" },
+        cachedResult: bybitResult,
+      })
+    ).toEqual({ ...bybitResult, errors: ["Bybit timeout"] });
+  });
+
+  it("creates an error-only result when matching-signature error has no cache", () => {
+    expect(
+      resolveActiveQuoteResult({
+        data: undefined,
+        activeSourceSignature: "Bybit",
+        error: { message: "Bybit timeout", sourceSignature: "Bybit" },
+        cachedResult: undefined,
+      })
+    ).toEqual({ quotes: {}, missingSymbols: [], errors: ["Bybit timeout"], updatedAt: 0 });
+  });
 });

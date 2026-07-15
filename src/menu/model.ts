@@ -1,5 +1,5 @@
 import type { Quote } from "#/types";
-import type { QuoteFetchResult } from "#/quotes/relay";
+import type { QuoteFetchResult } from "#/quotes/types";
 import type { RecentAlertsBySymbol } from "#/alerts/recentAlertState";
 import { getRecentAlertIndicator } from "#/alerts/recentAlertState";
 import { formatAge, formatPrice } from "#/utils/format";
@@ -12,6 +12,37 @@ export type MenuBarModel = {
   items: MenuItemModel[];
   sections: MenuSectionModel[];
 };
+
+export type ActiveQuoteData = {
+  result: QuoteFetchResult;
+  sourceSignature: string;
+};
+
+export type SourceError = {
+  message: string;
+  sourceSignature: string;
+};
+
+export type ResolveActiveQuoteResultInput = {
+  data: ActiveQuoteData | undefined;
+  activeSourceSignature: string;
+  error: SourceError | undefined;
+  cachedResult: QuoteFetchResult | undefined;
+};
+
+export function resolveActiveQuoteResult(input: ResolveActiveQuoteResultInput): QuoteFetchResult | undefined {
+  const activeData =
+    input.data && input.data.sourceSignature === input.activeSourceSignature ? input.data.result : undefined;
+  if (activeData) {
+    return activeData;
+  }
+  if (input.error && input.error.sourceSignature === input.activeSourceSignature) {
+    return input.cachedResult
+      ? { ...input.cachedResult, errors: [...input.cachedResult.errors, input.error.message] }
+      : { quotes: {}, missingSymbols: [], errors: [input.error.message], updatedAt: 0 };
+  }
+  return input.cachedResult;
+}
 
 export type BuildMenuBarModelInput = {
   displaySymbols: string[];

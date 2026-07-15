@@ -46,19 +46,32 @@
       "required": false
     },
     {
+      "name": "source",
+      "title": "Preferred Source",
+      "description": "Use Relay, or prefer one direct exchange and fall back to the other",
+      "type": "dropdown",
+      "default": "Bybit",
+      "required": false,
+      "data": [
+        { "title": "Bybit", "value": "Bybit" },
+        { "title": "Binance", "value": "Binance" },
+        { "title": "Relay", "value": "Relay" }
+      ]
+    },
+    {
       "name": "relayUrl",
       "title": "Relay URL",
       "description": "HTTPS base URL for the Beacon quote relay",
       "type": "textfield",
       "placeholder": "https://beacon.ramu.us",
-      "required": true
+      "required": false
     },
     {
       "name": "relayToken",
       "title": "Relay Token",
       "description": "Bearer token configured on the Beacon quote relay",
       "type": "password",
-      "required": true
+      "required": false
     },
     {
       "title": "Alert Rules",

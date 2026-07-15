@@ -18,8 +18,10 @@ import {
   parseIntegerAlertCooldownMinutes,
   parseIntegerAlertRulesText,
 } from "#/config/preferences";
-import { buildMenuBarModel } from "#/menu/model";
-import { fetchRelayQuotes, type QuoteFetchResult } from "#/quotes/relay";
+import { buildMenuBarModel, resolveActiveQuoteResult, type SourceError } from "#/menu/model";
+import { createQuoteSourceSignature, fetchQuotesForSource, type QuoteSource } from "#/quotes/source";
+import type { QuoteFetchResult } from "#/quotes/types";
+import { createTaggedQuoteCacheEntry, readTaggedQuoteCache, type TaggedQuoteCacheEntry } from "#/quotes/quoteCache";
 
 type MenuBarPreferences = {
   coins?: string;
@@ -28,6 +30,7 @@ type MenuBarPreferences = {
   integerAlertCooldownMinutes?: string;
   hideMenuBarSymbols?: boolean;
   hideCurrencySymbol?: boolean;
+  source?: QuoteSource;
   relayUrl?: string;
   relayToken?: string;
 };
@@ -36,20 +39,35 @@ type TaggedQuoteFetchResult = {
   result: QuoteFetchResult;
   ruleSignature: string;
   quoteSymbolSignature: string;
+  sourceSignature: string;
 };
+
+class TaggedQuoteFetchError extends Error {
+  constructor(message: string, readonly sourceSignature: string) {
+    super(message);
+  }
+}
+
+function isSourceError(error: unknown): error is SourceError {
+  return error instanceof Error && "sourceSignature" in error && typeof error.sourceSignature === "string";
+}
 
 async function fetchTaggedQuotes(
   symbols: string[],
   ruleSignature: string,
   quoteSymbolSignature: string,
+  source: QuoteSource,
   relayUrl: string | undefined,
   relayToken: string | undefined
 ): Promise<TaggedQuoteFetchResult> {
-  return {
-    result: await fetchRelayQuotes(symbols, relayUrl, relayToken),
-    ruleSignature,
-    quoteSymbolSignature,
-  };
+  const sourceSignature = createQuoteSourceSignature(source, relayUrl);
+  try {
+    const result = await fetchQuotesForSource(symbols, source, relayUrl, relayToken);
+    return { result, ruleSignature, quoteSymbolSignature, sourceSignature };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new TaggedQuoteFetchError(message, sourceSignature);
+  }
 }
 
 export default function Command() {
@@ -80,10 +98,12 @@ export default function Command() {
       ),
     [parsedRules.rules, parsedIntegerRules.rules]
   );
+  const source = preferences.source ?? "Bybit";
   const relayUrl = preferences.relayUrl?.trim() ?? "";
+  const quoteSourceSignature = createQuoteSourceSignature(source, relayUrl);
   const quoteSymbolSignature = useMemo(
-    () => `${relayUrl}:${createQuoteSymbolSignature(quoteSymbols)}`,
-    [relayUrl, quoteSymbols]
+    () => `${quoteSourceSignature}:${createQuoteSymbolSignature(quoteSymbols)}`,
+    [quoteSourceSignature, quoteSymbols]
   );
   const [recentAlerts, setRecentAlerts] = useCachedState<RecentAlertsBySymbol>(RECENT_ALERTS_CACHE_KEY, {});
   const alertScheduler = useMemo(
@@ -117,24 +137,26 @@ export default function Command() {
     [setRecentAlerts]
   );
 
-  const [cachedQuotes, setCachedQuotes] = useCachedState<QuoteFetchResult | undefined>("quote-cache", undefined);
+  const [cachedQuotes, setCachedQuotes] = useCachedState<TaggedQuoteCacheEntry | undefined>("quote-cache", undefined);
   const { data, isLoading, error } = usePromise(
     fetchTaggedQuotes,
-    [quoteSymbols, ruleSignature, quoteSymbolSignature, relayUrl, preferences.relayToken],
+    [quoteSymbols, ruleSignature, quoteSymbolSignature, source, relayUrl, preferences.relayToken],
     {
       execute: quoteSymbols.length > 0,
-      onData: ({ result }) => setCachedQuotes(result),
+      onData: ({ result, sourceSignature: capturedSourceSignature }) =>
+        setCachedQuotes(createTaggedQuoteCacheEntry(result, capturedSourceSignature)),
       onError: () => undefined,
     }
   );
 
-  const quoteResult =
-    data?.result ??
-    (error
-      ? cachedQuotes
-        ? { ...cachedQuotes, errors: [error.message] }
-        : { quotes: {}, missingSymbols: [], errors: [error.message], updatedAt: 0 }
-      : cachedQuotes);
+  const cachedResult = readTaggedQuoteCache(cachedQuotes, quoteSourceSignature);
+  const sourceError = isSourceError(error) ? error : undefined;
+  const quoteResult = resolveActiveQuoteResult({
+    data: data ? { result: data.result, sourceSignature: data.sourceSignature } : undefined,
+    activeSourceSignature: quoteSourceSignature,
+    error: sourceError,
+    cachedResult,
+  });
 
   useEffect(() => {
     if (!data) {
