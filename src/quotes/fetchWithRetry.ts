@@ -3,7 +3,7 @@ import { execFile } from "child_process";
 const DEFAULT_TIMEOUT_MS = 4500;
 const DEFAULT_ATTEMPTS = 2;
 
-type Fetcher = (url: string, timeoutMs: number) => Promise<Response>;
+type Fetcher = (url: string, timeoutMs: number, signal?: AbortSignal) => Promise<Response>;
 type CurlRunner = (url: string, timeoutMs: number, proxyArgs: string[]) => Promise<{ status: number; body: string }>;
 type ScutilRunner = () => Promise<string>;
 
@@ -44,11 +44,28 @@ export async function fetchJsonWithRetry<T>(url: string, options: FetchJsonOptio
 }
 
 async function fetchJson<T>(url: string, timeoutMs: number, fetcher: Fetcher): Promise<T> {
-  const response = await fetcher(url, timeoutMs);
-  if (!response.ok) {
-    throw new Error(`Request failed (${response.status} ${response.statusText || "HTTP error"}): ${url}`);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetcher(url, timeoutMs, controller.signal);
+    if (!response.ok) {
+      throw new Error(`Request failed (${response.status} ${response.statusText || "HTTP error"}): ${url}`);
+    }
+    // ponytail: race body parsing against abort so a stalled/injected body
+    // promise that ignores the signal still rejects at the timeout boundary.
+    return await Promise.race([response.json() as Promise<T>, rejectOnAbort(controller.signal, timeoutMs)]);
+  } finally {
+    clearTimeout(timeout);
   }
-  return (await response.json()) as T;
+}
+
+function rejectOnAbort(signal: AbortSignal, timeoutMs: number): Promise<never> {
+  return new Promise((_resolve, reject) => {
+    signal.addEventListener("abort", () => {
+      reject(new Error(`Request timed out after ${timeoutMs}ms`));
+    });
+  });
 }
 
 async function fetchJsonWithCurl<T>(
@@ -65,10 +82,8 @@ async function fetchJsonWithCurl<T>(
   return JSON.parse(response.body) as T;
 }
 
-function fetchWithTimeout(url: string, timeoutMs: number): Promise<Response> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(timeout));
+function fetchWithTimeout(url: string, _timeoutMs: number, signal?: AbortSignal): Promise<Response> {
+  return fetch(url, signal ? { signal } : {});
 }
 
 function getHttpsProxyArgs(scutilOutput: string): string[] {
