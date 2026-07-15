@@ -37,8 +37,6 @@ describe("quote source dispatch", () => {
 
   it("keys direct requests only by source and Relay requests by URL", () => {
     expect(createQuoteSourceSignature("Bybit", "https://unused.example.com")).toBe("Bybit");
-    expect(createQuoteSourceSignature("Relay", " https://relay.example.com ")).toBe(
-      "Relay:https://relay.example.com"
-    );
+    expect(createQuoteSourceSignature("Relay", " https://relay.example.com ")).toBe("Relay:https://relay.example.com");
   });
 });

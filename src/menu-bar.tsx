@@ -19,7 +19,8 @@ import {
   parseIntegerAlertRulesText,
 } from "#/config/preferences";
 import { buildMenuBarModel } from "#/menu/model";
-import { fetchRelayQuotes, type QuoteFetchResult } from "#/quotes/relay";
+import { createQuoteSourceSignature, fetchQuotesForSource, type QuoteSource } from "#/quotes/source";
+import type { QuoteFetchResult } from "#/quotes/types";
 
 type MenuBarPreferences = {
   coins?: string;
@@ -28,6 +29,7 @@ type MenuBarPreferences = {
   integerAlertCooldownMinutes?: string;
   hideMenuBarSymbols?: boolean;
   hideCurrencySymbol?: boolean;
+  source?: QuoteSource;
   relayUrl?: string;
   relayToken?: string;
 };
@@ -42,11 +44,12 @@ async function fetchTaggedQuotes(
   symbols: string[],
   ruleSignature: string,
   quoteSymbolSignature: string,
+  source: QuoteSource,
   relayUrl: string | undefined,
   relayToken: string | undefined
 ): Promise<TaggedQuoteFetchResult> {
   return {
-    result: await fetchRelayQuotes(symbols, relayUrl, relayToken),
+    result: await fetchQuotesForSource(symbols, source, relayUrl, relayToken),
     ruleSignature,
     quoteSymbolSignature,
   };
@@ -80,10 +83,12 @@ export default function Command() {
       ),
     [parsedRules.rules, parsedIntegerRules.rules]
   );
+  const source = preferences.source ?? "Bybit";
   const relayUrl = preferences.relayUrl?.trim() ?? "";
+  const quoteSourceSignature = createQuoteSourceSignature(source, relayUrl);
   const quoteSymbolSignature = useMemo(
-    () => `${relayUrl}:${createQuoteSymbolSignature(quoteSymbols)}`,
-    [relayUrl, quoteSymbols]
+    () => `${quoteSourceSignature}:${createQuoteSymbolSignature(quoteSymbols)}`,
+    [quoteSourceSignature, quoteSymbols]
   );
   const [recentAlerts, setRecentAlerts] = useCachedState<RecentAlertsBySymbol>(RECENT_ALERTS_CACHE_KEY, {});
   const alertScheduler = useMemo(
@@ -120,7 +125,7 @@ export default function Command() {
   const [cachedQuotes, setCachedQuotes] = useCachedState<QuoteFetchResult | undefined>("quote-cache", undefined);
   const { data, isLoading, error } = usePromise(
     fetchTaggedQuotes,
-    [quoteSymbols, ruleSignature, quoteSymbolSignature, relayUrl, preferences.relayToken],
+    [quoteSymbols, ruleSignature, quoteSymbolSignature, source, relayUrl, preferences.relayToken],
     {
       execute: quoteSymbols.length > 0,
       onData: ({ result }) => setCachedQuotes(result),
