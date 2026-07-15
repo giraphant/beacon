@@ -41,6 +41,27 @@ describe("fetchQuotesFromSources", () => {
     expect(result.missingSymbols).toEqual(["SOL"]);
     expect(result.errors).toEqual(["Bybit: down"]);
   });
+
+  it("rejects with an aggregate error when every source throws", async () => {
+    const sources: QuoteSource[] = [
+      {
+        name: "Bybit",
+        fetchQuotes: async () => {
+          throw new Error("bybit down");
+        },
+      },
+      {
+        name: "Binance",
+        fetchQuotes: async () => {
+          throw new Error("binance down");
+        },
+      },
+    ];
+
+    await expect(fetchQuotesFromSources(["BTC"], sources, 10_000)).rejects.toThrow(
+      "Bybit: bybit down, Binance: binance down"
+    );
+  });
 });
 
 describe("getQuoteSources", () => {

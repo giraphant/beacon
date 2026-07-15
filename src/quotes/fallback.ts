@@ -30,12 +30,14 @@ export async function fetchQuotesFromSources(
   const uniqueSymbols = [...new Set(symbols)];
   const quotes: Record<string, Quote> = {};
   const errors: string[] = [];
+  let attemptedSources = 0;
 
   for (const source of sources) {
     const missing = uniqueSymbols.filter((symbol) => !quotes[symbol]);
     if (missing.length === 0) {
       break;
     }
+    attemptedSources += 1;
 
     try {
       const sourceQuotes = await source.fetchQuotes(missing);
@@ -48,6 +50,10 @@ export async function fetchQuotesFromSources(
       const message = error instanceof Error ? error.message : String(error);
       errors.push(`${source.name}: ${message}`);
     }
+  }
+
+  if (attemptedSources > 0 && errors.length === attemptedSources) {
+    throw new Error(errors.join(", "));
   }
 
   return {

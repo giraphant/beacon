@@ -21,6 +21,7 @@ import {
 import { buildMenuBarModel } from "#/menu/model";
 import { createQuoteSourceSignature, fetchQuotesForSource, type QuoteSource } from "#/quotes/source";
 import type { QuoteFetchResult } from "#/quotes/types";
+import { createTaggedQuoteCacheEntry, readTaggedQuoteCache, type TaggedQuoteCacheEntry } from "#/quotes/quoteCache";
 
 type MenuBarPreferences = {
   coins?: string;
@@ -38,6 +39,7 @@ type TaggedQuoteFetchResult = {
   result: QuoteFetchResult;
   ruleSignature: string;
   quoteSymbolSignature: string;
+  sourceSignature: string;
 };
 
 async function fetchTaggedQuotes(
@@ -48,10 +50,12 @@ async function fetchTaggedQuotes(
   relayUrl: string | undefined,
   relayToken: string | undefined
 ): Promise<TaggedQuoteFetchResult> {
+  const result = await fetchQuotesForSource(symbols, source, relayUrl, relayToken);
   return {
-    result: await fetchQuotesForSource(symbols, source, relayUrl, relayToken),
+    result,
     ruleSignature,
     quoteSymbolSignature,
+    sourceSignature: createQuoteSourceSignature(source, relayUrl),
   };
 }
 
@@ -122,24 +126,26 @@ export default function Command() {
     [setRecentAlerts]
   );
 
-  const [cachedQuotes, setCachedQuotes] = useCachedState<QuoteFetchResult | undefined>("quote-cache", undefined);
+  const [cachedQuotes, setCachedQuotes] = useCachedState<TaggedQuoteCacheEntry | undefined>("quote-cache", undefined);
   const { data, isLoading, error } = usePromise(
     fetchTaggedQuotes,
     [quoteSymbols, ruleSignature, quoteSymbolSignature, source, relayUrl, preferences.relayToken],
     {
       execute: quoteSymbols.length > 0,
-      onData: ({ result }) => setCachedQuotes(result),
+      onData: ({ result, sourceSignature: capturedSourceSignature }) =>
+        setCachedQuotes(createTaggedQuoteCacheEntry(result, capturedSourceSignature)),
       onError: () => undefined,
     }
   );
 
+  const cachedResult = readTaggedQuoteCache(cachedQuotes, quoteSourceSignature);
   const quoteResult =
     data?.result ??
     (error
-      ? cachedQuotes
-        ? { ...cachedQuotes, errors: [error.message] }
+      ? cachedResult
+        ? { ...cachedResult, errors: [...cachedResult.errors, error.message] }
         : { quotes: {}, missingSymbols: [], errors: [error.message], updatedAt: 0 }
-      : cachedQuotes);
+      : cachedResult);
 
   useEffect(() => {
     if (!data) {
