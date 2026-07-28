@@ -15,6 +15,12 @@ final class SettingsWindowController: NSWindowController {
         window.title = "Beacon"
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
         window.titlebarAppearsTransparent = true
+        // An (empty) toolbar is what makes SwiftUI's `navigationTitle` render
+        // as the bold pane title in the detail column; without one AppKit just
+        // centers the window title instead.
+        let toolbar = NSToolbar(identifier: "BeaconSettingsToolbar")
+        toolbar.displayMode = .iconOnly
+        window.toolbar = toolbar
         window.toolbarStyle = .unified
         window.isReleasedWhenClosed = false
         // A hosting controller sizes the window to the SwiftUI content, and a
@@ -96,7 +102,7 @@ struct SettingsView: View {
                     .tag(pane)
             }
             .listStyle(.sidebar)
-            .navigationSplitViewColumnWidth(min: 150, ideal: 170, max: 210)
+            .navigationSplitViewColumnWidth(min: 160, ideal: 180, max: 220)
         } detail: {
             detailView
                 .navigationTitle((selectedPane ?? .symbols).title)
@@ -119,7 +125,7 @@ struct SettingsView: View {
             Section {
                 TextField("Watchlist", text: $coins)
                 Text("Space separated. A `|` splits menu-bar symbols from dropdown-only ones: `BTC ETH | NVDA QQQ`.")
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundStyle(.secondary)
             }
 
@@ -136,11 +142,11 @@ struct SettingsView: View {
             Section("Rules") {
                 TextField("Percent rules", text: $alertRules)
                 Text("`BTC:1 ETH:2` alerts when the price moves that percent from the last alert.")
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundStyle(.secondary)
                 TextField("Boundary rules", text: $integerAlertRules)
                 Text("`BTC:1000 JUP:0.05` alerts when the price crosses a multiple of that step.")
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundStyle(.secondary)
                 TextField("Boundary cooldown (minutes)", text: $cooldownMinutes)
             }
@@ -186,7 +192,7 @@ struct SettingsView: View {
                         }
                     if let tokenError {
                         Text(tokenError)
-                            .font(.caption)
+                            .font(.callout)
                             .foregroundStyle(.red)
                     }
                 }
