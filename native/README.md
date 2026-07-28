@@ -47,3 +47,23 @@ make test       # DEVELOPER_DIR-wrapped swift test
 `XCTest` only ships inside Xcode.app; without the `DEVELOPER_DIR` override a
 CommandLineTools-selected toolchain fails with `no such module 'XCTest'`.
 `swift build` needs no such override.
+
+## Local quote diagnostics
+
+The diagnostic build writes a bounded JSONL trace to:
+
+```text
+~/Library/Logs/Beacon/quote-diagnostics.jsonl
+```
+
+The current and previous files are capped at 256 KiB each. Events identify the
+app/build, quote request, relay result, per-symbol `updatedAt`/age/`stale`, and
+whether the menu displays a live result or the last successful result after a
+refresh error. Quote values, relay URLs, bearer tokens, Authorization headers,
+keychain contents, and raw response bodies are never written.
+
+Monitor it without opening the menu:
+
+```bash
+tail -F ~/Library/Logs/Beacon/quote-diagnostics.jsonl
+```

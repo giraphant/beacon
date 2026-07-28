@@ -120,6 +120,25 @@ final class MenuModelTests: XCTestCase {
         )])
     }
 
+    func testReportsTheOldestDisplayedQuoteAgeInsteadOfRelayResponseTime() {
+        let model = buildMenuBarModel(MenuBarModelInput(
+            displaySymbols: ["BTC", "QQQ"],
+            quoteResult: result(
+                [
+                    quote("BTC", 103_245.18, updatedAt: 11_700),
+                    quote("QQQ", 567.89, updatedAt: 8_000),
+                ],
+                updatedAt: 11_950
+            ),
+            now: 12_000
+        ))
+
+        XCTAssertEqual(model.sections.first?.items, [
+            "Source: Bybit linear (USDT)",
+            "Updated: 4s ago",
+        ])
+    }
+
     func testDeduplicatesSourcesInOrderOfAppearance() {
         let model = buildMenuBarModel(MenuBarModelInput(
             displaySymbols: ["BTC", "ETH", "NVDA"],

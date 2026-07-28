@@ -100,9 +100,13 @@ public func buildMenuBarModel(_ input: MenuBarModelInput) -> MenuBarModel {
 
     if let result = input.quoteResult {
         let staleSymbols = displayQuotes.filter(\.stale).map(\.symbol)
+        let oldestQuoteUpdatedAt = displayQuotes
+            .map(\.updatedAt)
+            .filter { $0 > 0 && $0.isFinite }
+            .min()
         let statusItems: [String?] = [
             sourceLine(for: displayQuotes),
-            result.updatedAt != 0 ? "Updated: \(formatAge(updatedAt: result.updatedAt, now: input.now))" : nil,
+            oldestQuoteUpdatedAt.map { "Updated: \(formatAge(updatedAt: $0, now: input.now))" },
             result.missingSymbols.isEmpty ? nil : "Not found: \(result.missingSymbols.joined(separator: ", "))",
             staleSymbols.isEmpty ? nil : "Stale: \(staleSymbols.joined(separator: ", "))",
             result.errors.isEmpty ? nil : "Refresh issues: \(result.errors.joined(separator: "; "))",

@@ -13,6 +13,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var recentAlerts: [String: RecentAlert] = [:]
 
     private let stateStore = AlertStateStore()
+    private let diagnostics = QuoteDiagnosticLogger.shared
     private var timer: Timer?
     private var refreshTask: Task<Void, Never>?
     private var refreshPending = false
@@ -104,6 +105,11 @@ final class AppModel: ObservableObject {
         }
 
         let now = Date().timeIntervalSince1970 * 1000
+        let diagnosticRequest = await diagnostics.begin(
+            source: preferences.source,
+            symbols: quoteSymbols,
+            at: now
+        )
         do {
             let result = try await fetchQuotes(
                 symbols: quoteSymbols,
@@ -116,6 +122,9 @@ final class AppModel: ObservableObject {
             )
             lastGood = result
             displayed = result
+            let completedAt = Date().timeIntervalSince1970 * 1_000
+            await diagnostics.succeeded(diagnosticRequest, result: result, at: completedAt)
+            await diagnostics.displayed(diagnosticRequest, origin: .live, result: result, at: completedAt)
             // Settings changed while this fetch was in flight: these quotes were
             // taken under rules the user has since replaced, and the requeued
             // refresh will re-evaluate them under the new ones.
@@ -131,11 +140,26 @@ final class AppModel: ObservableObject {
             }
         } catch {
             let message = quoteErrorMessage(error)
+            let completedAt = Date().timeIntervalSince1970 * 1_000
+            await diagnostics.failed(diagnosticRequest, error: error, at: completedAt)
             if var cached = lastGood {
                 cached.errors.append(message)
                 displayed = cached
+                await diagnostics.displayed(
+                    diagnosticRequest,
+                    origin: .cacheAfterError,
+                    result: cached,
+                    at: completedAt
+                )
             } else {
-                displayed = QuoteFetchResult(errors: [message])
+                let errorOnly = QuoteFetchResult(errors: [message])
+                displayed = errorOnly
+                await diagnostics.displayed(
+                    diagnosticRequest,
+                    origin: .errorOnly,
+                    result: errorOnly,
+                    at: completedAt
+                )
             }
         }
 
