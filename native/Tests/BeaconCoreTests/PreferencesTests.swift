@@ -92,4 +92,98 @@ final class PreferencesTests: XCTestCase {
             IntegerAlertRule(symbol: "BTC", step: 500),
         ])
     }
+
+    // MARK: - Structured settings adapters
+
+    func testWatchlistRowsMigrateFromAndBackToRaycastText() {
+        let rows = parseWatchlistText("btc eth | NVDA QQQ")
+        XCTAssertEqual(rows, [
+            WatchlistEntry(symbol: "BTC", showInMenuBar: true),
+            WatchlistEntry(symbol: "ETH", showInMenuBar: true),
+            WatchlistEntry(symbol: "NVDA", showInMenuBar: false),
+            WatchlistEntry(symbol: "QQQ", showInMenuBar: false),
+        ])
+        XCTAssertEqual(serializeWatchlist(rows), "BTC ETH | NVDA QQQ")
+    }
+
+    func testWatchlistSerializerNormalizesAndDeduplicatesRows() {
+        XCTAssertEqual(serializeWatchlist([
+            WatchlistEntry(symbol: " nvda ", showInMenuBar: false),
+            WatchlistEntry(symbol: "btc", showInMenuBar: true),
+            WatchlistEntry(symbol: "BTC", showInMenuBar: false),
+            WatchlistEntry(symbol: ""),
+        ]), "BTC | NVDA")
+    }
+
+    func testRuleSerializersKeepAlertOnlySymbolsAndPlainDecimals() {
+        XCTAssertEqual(serializeAlertRules([
+            AlertRule(symbol: " btc ", thresholdPercent: 1.25),
+            AlertRule(symbol: "jup", thresholdPercent: 2),
+        ]), "BTC:1.25 JUP:2")
+        XCTAssertEqual(serializeIntegerAlertRules([
+            IntegerAlertRule(symbol: "JUP", step: 0.000000000001),
+        ]), "JUP:0.000000000001")
+    }
+
+    func testRuleSerializerKeepsLastDuplicate() {
+        XCTAssertEqual(serializeAlertRules([
+            AlertRule(symbol: "BTC", thresholdPercent: 1),
+            AlertRule(symbol: "ETH", thresholdPercent: 2),
+            AlertRule(symbol: "btc", thresholdPercent: 3),
+        ]), "ETH:2 BTC:3")
+    }
+
+    func testSingleSymbolNormalizerRejectsMultipleOrMalformedTokens() {
+        XCTAssertEqual(normalizePreferenceSymbol(" btc "), "BTC")
+        XCTAssertEqual(normalizePreferenceSymbol("BTC-USDT"), "BTC-USDT")
+        XCTAssertNil(normalizePreferenceSymbol("BTC ETH"))
+        XCTAssertNil(normalizePreferenceSymbol("BTC:1"))
+        XCTAssertNil(normalizePreferenceSymbol(""))
+    }
+
+    func testUnifiedSettingsMergeAllThreeLegacyStringsWithoutLosingAlertOnlySymbols() {
+        let rows = parseSymbolSettings(
+            coins: "BTC | NVDA",
+            alertRules: "BTC:1 SOL:2",
+            integerAlertRules: "BTC:1000 JUP:0.05"
+        )
+        XCTAssertEqual(rows, [
+            SymbolSettingsEntry(
+                symbol: "BTC", displayMode: .menuBar,
+                alertPercent: 1, boundaryStep: 1000
+            ),
+            SymbolSettingsEntry(symbol: "NVDA", displayMode: .dropdown),
+            SymbolSettingsEntry(symbol: "SOL", displayMode: .alertsOnly, alertPercent: 2),
+            SymbolSettingsEntry(symbol: "JUP", displayMode: .alertsOnly, boundaryStep: 0.05),
+        ])
+    }
+
+    func testUnifiedSettingsSplitBackToCompatibleStrings() {
+        let strings = serializeSymbolSettings([
+            SymbolSettingsEntry(
+                symbol: "BTC", displayMode: .menuBar,
+                alertPercent: 1, boundaryStep: 1000
+            ),
+            SymbolSettingsEntry(symbol: "NVDA", displayMode: .dropdown),
+            SymbolSettingsEntry(symbol: "SOL", displayMode: .alertsOnly, alertPercent: 2),
+            SymbolSettingsEntry(symbol: "JUP", displayMode: .alertsOnly, boundaryStep: 0.05),
+        ])
+        XCTAssertEqual(strings, SymbolSettingsStrings(
+            coins: "BTC | NVDA",
+            alertRules: "BTC:1 SOL:2",
+            integerAlertRules: "BTC:1000 JUP:0.05"
+        ))
+    }
+
+    func testUnifiedSettingsDuplicatesKeepOneCompleteRow() {
+        let strings = serializeSymbolSettings([
+            SymbolSettingsEntry(symbol: "BTC", displayMode: .menuBar, alertPercent: 1),
+            SymbolSettingsEntry(symbol: "btc", displayMode: .alertsOnly, boundaryStep: 500),
+        ])
+        XCTAssertEqual(strings, SymbolSettingsStrings(
+            coins: "BTC",
+            alertRules: "BTC:1",
+            integerAlertRules: ""
+        ))
+    }
 }

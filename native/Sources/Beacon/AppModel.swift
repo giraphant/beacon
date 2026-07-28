@@ -156,7 +156,6 @@ final class AppModel: ObservableObject {
             quoteResult: displayed,
             invalidRuleTokens: percentRules.invalidTokens,
             invalidIntegerRuleTokens: integerRules.invalidTokens,
-            recentAlerts: recentAlerts,
             isLoading: displayed == nil,
             now: Date().timeIntervalSince1970 * 1000
         ))

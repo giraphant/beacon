@@ -98,25 +98,14 @@ final class MenuModelTests: XCTestCase {
         XCTAssertEqual(model.items, ["ETH: 3,422"])
     }
 
-    func testMarksRecentlyAlertedSymbolsInTheDropdown() {
-        let notification = AlertNotification(
-            symbol: "ETH",
-            title: "ETH fell 2.00%",
-            message: "",
-            movementPercent: -2,
-            thresholdPercent: 1,
-            crossedSteps: 2,
-            currentPrice: 3_421.5,
-            baselinePrice: 3_491.5
-        )
+    func testKeepsAlertPresentationOutOfQuoteText() {
         let model = buildMenuBarModel(MenuBarModelInput(
             displaySymbols: ["BTC", "ETH"],
             titleSymbols: ["BTC"],
             quoteResult: result([quote("BTC", 103_245.18), quote("ETH", 3_421.5)]),
-            recentAlerts: ["ETH": RecentAlert(notification: notification, triggeredAt: 11_000)],
             now: 12_000
         ))
-        XCTAssertEqual(model.items, ["🔴 ETH: $3,422"])
+        XCTAssertEqual(model.items, ["ETH: $3,422"])
     }
 
     func testReportsSourceAndAgeInTheStatusSection() {

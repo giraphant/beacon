@@ -101,11 +101,27 @@ func formatNumberKey(_ value: Double) -> String {
 enum Keychain {
     nonisolated private static let service = "com.inol.beacon"
 
+    private enum CacheEntry {
+        case value(String)
+        case missing
+
+        var value: String? {
+            switch self {
+            case let .value(value): value
+            case .missing: nil
+            }
+        }
+    }
+
     /// Every `SecItemCopyMatching` can raise the access prompt, so reading once
     /// per refresh means a dialog every 30s on a bundle whose signature macOS
     /// does not recognise. Cache the value for the process lifetime; `write` is
     /// the only thing that can invalidate it.
-    private static var cache: [String: String?] = [:]
+    private static var cache: [String: CacheEntry] = [:]
+    /// App startup and Settings can ask for the relay token at the same time.
+    /// Cache alone is insufficient while the first read is still suspended on
+    /// the system access dialog, so concurrent callers share the same task.
+    private static var pendingReads: [String: Task<String?, Never>] = [:]
 
     /// Off the main thread, always. A `SecItem*` call blocks until the user
     /// answers the access dialog — and that dialog cannot be drawn while the
@@ -114,10 +130,28 @@ enum Keychain {
     /// keeps its empty title, and macOS eventually tears down the unresponsive
     /// menu bar scene. Symptom is an app that runs with no icon and no crash.
     static func read(_ account: String) async -> String? {
-        if let cached = cache[account] { return cached }
-        let value = await Task.detached(priority: .utility) { load(account) }.value
-        cache[account] = value
+        await read(account, loader: { load(account) })
+    }
+
+    static func read(
+        _ account: String,
+        loader: @escaping @Sendable () -> String?
+    ) async -> String? {
+        if let cached = cache[account] { return cached.value }
+        if let pending = pendingReads[account] { return await pending.value }
+
+        let pending = Task.detached(priority: .utility, operation: loader)
+        pendingReads[account] = pending
+        let value = await pending.value
+        pendingReads[account] = nil
+        cache[account] = value.map(CacheEntry.value) ?? .missing
         return value
+    }
+
+    static func resetCacheForTesting() {
+        pendingReads.values.forEach { $0.cancel() }
+        pendingReads.removeAll()
+        cache.removeAll()
     }
 
     nonisolated private static func load(_ account: String) -> String? {
@@ -141,9 +175,13 @@ enum Keychain {
     /// authenticating with a token that was never stored.
     @discardableResult
     static func write(_ value: String, account: String) async -> Bool {
+        if let pending = pendingReads[account] {
+            _ = await pending.value
+            pendingReads[account] = nil
+        }
         let saved = await Task.detached(priority: .utility) { store(value, account) }.value
         guard saved else { return false }
-        cache[account] = value.isEmpty ? String?.none : value
+        cache[account] = value.isEmpty ? .missing : .value(value)
         return true
     }
 

@@ -16,8 +16,6 @@ public struct RecentAlert: Equatable, Codable, Sendable {
         self.message = notification.message
         self.triggeredAt = triggeredAt
     }
-
-    public var indicator: String { direction == .up ? "🟢" : "🔴" }
 }
 
 public struct MenuSection: Equatable {
@@ -52,7 +50,6 @@ public struct MenuBarModelInput {
     public var quoteResult: QuoteFetchResult?
     public var invalidRuleTokens: [String] = []
     public var invalidIntegerRuleTokens: [String] = []
-    public var recentAlerts: [String: RecentAlert] = [:]
     public var isLoading = false
     public var now: Millis
 
@@ -64,7 +61,6 @@ public struct MenuBarModelInput {
         quoteResult: QuoteFetchResult? = nil,
         invalidRuleTokens: [String] = [],
         invalidIntegerRuleTokens: [String] = [],
-        recentAlerts: [String: RecentAlert] = [:],
         isLoading: Bool = false,
         now: Millis
     ) {
@@ -75,7 +71,6 @@ public struct MenuBarModelInput {
         self.quoteResult = quoteResult
         self.invalidRuleTokens = invalidRuleTokens
         self.invalidIntegerRuleTokens = invalidIntegerRuleTokens
-        self.recentAlerts = recentAlerts
         self.isLoading = isLoading
         self.now = now
     }
@@ -97,9 +92,8 @@ public func buildMenuBarModel(_ input: MenuBarModelInput) -> MenuBarModel {
         hideTitleSymbols: input.hideTitleSymbols,
         hideCurrencySymbol: hideCurrency
     )
-    let items = dropdownQuotes.map { quote -> String in
-        let prefix = input.recentAlerts[quote.symbol].map { "\($0.indicator) " } ?? ""
-        return "\(prefix)\(quote.symbol): \(formatPrice(quote.price, hideCurrencySymbol: hideCurrency))"
+    let items = dropdownQuotes.map { quote in
+        "\(quote.symbol): \(formatPrice(quote.price, hideCurrencySymbol: hideCurrency))"
     }
 
     var sections: [MenuSection] = []

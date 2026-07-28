@@ -8,5 +8,6 @@ let package = Package(
         .target(name: "BeaconCore", swiftSettings: [.enableUpcomingFeature("BareSlashRegexLiterals")]),
         .executableTarget(name: "Beacon", dependencies: ["BeaconCore"]),
         .testTarget(name: "BeaconCoreTests", dependencies: ["BeaconCore"]),
+        .testTarget(name: "BeaconAppTests", dependencies: ["Beacon", "BeaconCore"]),
     ]
 )

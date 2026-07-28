@@ -26,11 +26,11 @@ final class SettingsWindowController: NSWindowController {
         // A hosting controller sizes the window to the SwiftUI content, and a
         // NavigationSplitView has no size of its own — without this it opens at
         // `minSize`.
-        window.setContentSize(NSSize(width: 760, height: 540))
-        window.minSize = NSSize(width: 640, height: 420)
-        // Not the pre-sidebar autosave name: a frame saved by the old
-        // single-form window is too narrow for the split view.
-        window.setFrameAutosaveName("BeaconSettingsWindowSplit")
+        window.setContentSize(NSSize(width: 780, height: 600))
+        window.minSize = NSSize(width: 700, height: 460)
+        // The flow layout no longer needs the very wide frame users may have
+        // saved while the symbol editor was a single horizontal row.
+        window.setFrameAutosaveName("BeaconSettingsWindowFlowLayout")
         super.init(window: window)
         window.center()
     }
@@ -51,28 +51,25 @@ final class SettingsWindowController: NSWindowController {
 }
 
 private enum SettingsPane: String, CaseIterable, Identifiable {
-    case symbols
-    case alerts
-    case source
     case general
+    case symbols
+    case source
 
     var id: Self { self }
 
     var title: String {
         switch self {
-        case .symbols: "Symbols"
-        case .alerts: "Alerts"
-        case .source: "Source"
         case .general: "General"
+        case .symbols: "Symbols"
+        case .source: "Source"
         }
     }
 
     var symbolName: String {
         switch self {
-        case .symbols: "chart.line.uptrend.xyaxis"
-        case .alerts: "bell"
-        case .source: "antenna.radiowaves.left.and.right"
         case .general: "gearshape"
+        case .symbols: "chart.line.uptrend.xyaxis"
+        case .source: "antenna.radiowaves.left.and.right"
         }
     }
 }
@@ -97,7 +94,9 @@ struct SettingsView: View {
     /// and persist a token the user has already typed past.
     @State private var tokenWrite: Task<Void, Never>?
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
-    @State private var selectedPane: SettingsPane? = .symbols
+    @State private var selectedPane: SettingsPane? = .general
+    @State private var symbolRows: [SymbolSettingsEditorRow] = []
+    @State private var structuredPreferencesLoaded = false
 
     var body: some View {
         NavigationSplitView {
@@ -109,54 +108,77 @@ struct SettingsView: View {
             .navigationSplitViewColumnWidth(min: 160, ideal: 180, max: 220)
         } detail: {
             detailView
-                .navigationTitle((selectedPane ?? .symbols).title)
+                .navigationTitle((selectedPane ?? .general).title)
         }
-        .task { relayToken = await Keychain.read(PreferenceKey.relayToken) ?? "" }
+        .task {
+            loadStructuredPreferences()
+            relayToken = await Keychain.read(PreferenceKey.relayToken) ?? ""
+        }
+        .onChange(of: symbolRows) { _, rows in
+            guard structuredPreferencesLoaded else { return }
+            let values = serializeSymbolSettings(rows.compactMap(\.entry))
+            if coins != values.coins { coins = values.coins }
+            if alertRules != values.alertRules { alertRules = values.alertRules }
+            if integerAlertRules != values.integerAlertRules {
+                integerAlertRules = values.integerAlertRules
+            }
+        }
     }
 
     @ViewBuilder
     private var detailView: some View {
-        switch selectedPane ?? .symbols {
-        case .symbols: symbolsPane
-        case .alerts: alertsPane
-        case .source: sourcePane
+        switch selectedPane ?? .general {
         case .general: generalPane
+        case .symbols: symbolsPane
+        case .source: sourcePane
         }
     }
 
     private var symbolsPane: some View {
-        Form {
-            Section {
-                TextField("Watchlist", text: $coins)
-                Text("Space separated. A `|` splits menu-bar symbols from dropdown-only ones: `BTC ETH | NVDA QQQ`.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section("Menu Bar") {
-                Toggle("Hide symbols in menu bar", isOn: $hideMenuBarSymbols)
-                Toggle("Hide currency symbol", isOn: $hideCurrencySymbol)
-            }
+        ScrollView {
+            SymbolSettingsEditor(rows: $symbolRows)
+                .padding(24)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .formStyle(.grouped)
     }
 
-    private var alertsPane: some View {
+    private var generalPane: some View {
         Form {
-            Section("Rules") {
-                TextField("Percent rules", text: $alertRules)
-                Text("`BTC:1 ETH:2` alerts when the price moves that percent from the last alert.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                TextField("Boundary rules", text: $integerAlertRules)
-                Text("`BTC:1000 JUP:0.05` alerts when the price crosses a multiple of that step.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                TextField("Boundary cooldown (minutes)", text: $cooldownMinutes)
+            Section("Startup") {
+                Toggle("Launch at login", isOn: $launchAtLogin)
+                    .toggleStyle(.switch)
+                    .help("Open Beacon automatically after you sign in.")
+                    .onChange(of: launchAtLogin) { _, enabled in
+                        setLaunchAtLogin(enabled)
+                    }
             }
 
-            Section {
-                Toggle("Play sound", isOn: $alertSoundEnabled)
+            Section("Display") {
+                Toggle("Show symbols in the menu bar", isOn: showMenuBarSymbolsBinding)
+                    .toggleStyle(.switch)
+                    .help("Keep symbol names next to their rotating prices.")
+
+                Toggle("Show the currency symbol", isOn: showCurrencySymbolBinding)
+                    .toggleStyle(.switch)
+                    .help("Prefix USD prices with a dollar sign.")
+            }
+
+            Section("Notifications") {
+                Stepper(
+                    "Price-level cooldown: \(cooldownDisplayLabel)",
+                    value: cooldownBinding,
+                    in: 0...1440,
+                    step: 1
+                )
+                .help("Suppress a recently crossed level for this long.")
+
+                Toggle("Play a sound", isOn: $alertSoundEnabled)
+                    .toggleStyle(.switch)
+                    .help("Play the system alert sound with each notification.")
+            }
+
+            Section("About") {
+                LabeledContent("Version", value: Self.appVersion)
             }
         }
         .formStyle(.grouped)
@@ -213,25 +235,54 @@ struct SettingsView: View {
         .formStyle(.grouped)
     }
 
-    private var generalPane: some View {
-        Form {
-            Section("Startup") {
-                Toggle("Launch at login", isOn: $launchAtLogin)
-                    .onChange(of: launchAtLogin) { _, enabled in
-                        setLaunchAtLogin(enabled)
-                    }
-            }
-
-            Section("About") {
-                LabeledContent("Version", value: Self.appVersion)
-            }
-        }
-        .formStyle(.grouped)
-    }
-
     /// "dev" outside a bundle (`swift run`), the Info.plist version inside one.
     private static let appVersion =
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
+
+    private var showMenuBarSymbolsBinding: Binding<Bool> {
+        Binding(
+            get: { !hideMenuBarSymbols },
+            set: { hideMenuBarSymbols = !$0 }
+        )
+    }
+
+    private var showCurrencySymbolBinding: Binding<Bool> {
+        Binding(
+            get: { !hideCurrencySymbol },
+            set: { hideCurrencySymbol = !$0 }
+        )
+    }
+
+    private var cooldownBinding: Binding<Double> {
+        Binding(
+            get: { parseIntegerAlertCooldownMinutes(cooldownMinutes) },
+            set: { value in
+                cooldownMinutes = value == 0 ? "0" : (formatPreferenceNumber(value) ?? "10")
+            }
+        )
+    }
+
+    private var cooldownDisplay: String {
+        let value = cooldownBinding.wrappedValue
+        return value == 0 ? "Off" : (formatPreferenceNumber(value) ?? "10")
+    }
+
+    private var cooldownDisplayLabel: String {
+        cooldownDisplay == "Off" ? "Off" : "\(cooldownDisplay) min"
+    }
+
+    /// Convert the Raycast-era strings into rows once when Settings first
+    /// opens. Saving still targets the old keys, so upgrades keep all working
+    /// preferences and the Raycast extension remains compatible.
+    private func loadStructuredPreferences() {
+        guard !structuredPreferencesLoaded else { return }
+        symbolRows = parseSymbolSettings(
+            coins: coins,
+            alertRules: alertRules,
+            integerAlertRules: integerAlertRules
+        ).map { SymbolSettingsEditorRow(entry: $0) }
+        structuredPreferencesLoaded = true
+    }
 
     /// Registration needs a signed bundle; if it fails, snap the toggle back
     /// rather than showing a state the system does not actually have.
