@@ -11,7 +11,12 @@ final class SettingsWindowController: NSWindowController {
     static let shared = SettingsWindowController()
 
     init() {
-        let window = NSWindow(contentViewController: NSHostingController(rootView: SettingsView()))
+        let host = NSHostingController(rootView: SettingsView())
+        // Never let SwiftUI's ideal size drive the window: with a content-
+        // sized table inside, every row add/remove would resize — and, since
+        // AppKit anchors at the bottom-left, visually move — the window.
+        host.sizingOptions = []
+        let window = NSWindow(contentViewController: host)
         window.title = "Beacon"
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
         window.titlebarAppearsTransparent = true
@@ -127,7 +132,6 @@ struct SettingsView: View {
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var selectedPane: SettingsPane? = .symbols
     @State private var symbolRows: [SymbolRow] = []
-    @State private var symbolSelection: SymbolRow.ID?
 
     var body: some View {
         NavigationSplitView {
@@ -161,12 +165,16 @@ struct SettingsView: View {
                 Text("Menu Bar").frame(width: 64)
                 Text("Alert %").frame(width: 72)
                 Text("Step").frame(width: 84)
+                Color.clear.frame(width: 20)
             }
             .font(.callout)
             .foregroundStyle(.secondary)
             .padding(.horizontal, 16)
 
-            List(selection: $symbolSelection) {
+            // No row selection: a selectable List swallows the first click,
+            // so the text fields would never get focus and the table reads as
+            // display-only. Rows delete via their own ⊖ instead.
+            List {
                 ForEach($symbolRows) { $row in
                     HStack(spacing: 8) {
                         TextField("Symbol", text: $row.symbol, prompt: Text("SYMBOL"))
@@ -178,21 +186,24 @@ struct SettingsView: View {
                             .frame(width: 64)
                         ruleField("Alert %", text: $row.percentText, width: 72)
                         ruleField("Step", text: $row.stepText, width: 84)
+                        Button {
+                            symbolRows.removeAll { $0.id == row.id }
+                        } label: {
+                            Image(systemName: "minus.circle.fill")
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.borderless)
+                        .frame(width: 20)
                     }
                 }
                 .onMove { symbolRows.move(fromOffsets: $0, toOffset: $1) }
             }
             .listStyle(.bordered)
             .alternatingRowBackgrounds()
-            .onDeleteCommand(perform: removeSelectedSymbolRow)
             .frame(height: symbolTableHeight)
 
-            HStack(spacing: 12) {
-                Button(action: addSymbolRow) { Image(systemName: "plus") }
-                Button(action: removeSelectedSymbolRow) { Image(systemName: "minus") }
-                    .disabled(symbolSelection == nil)
-            }
-            .buttonStyle(.borderless)
+            Button(action: addSymbolRow) { Image(systemName: "plus") }
+                .buttonStyle(.borderless)
 
             Text("Checked symbols cycle through the menu-bar title; unchecked ones only appear in the dropdown. Drag rows to reorder. Alert % notifies when the price moves that percent since the last alert, Step when it crosses a multiple of that step — leave a cell empty for no alert.")
                 .font(.callout)
@@ -238,15 +249,7 @@ struct SettingsView: View {
     }
 
     private func addSymbolRow() {
-        let row = SymbolRow()
-        symbolRows.append(row)
-        symbolSelection = row.id
-    }
-
-    private func removeSelectedSymbolRow() {
-        guard let selection = symbolSelection else { return }
-        symbolRows.removeAll { $0.id == selection }
-        symbolSelection = nil
+        symbolRows.append(SymbolRow())
     }
 
     private var alertsPane: some View {
