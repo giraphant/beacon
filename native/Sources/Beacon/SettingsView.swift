@@ -11,10 +11,10 @@ final class SettingsWindowController: NSWindowController {
     static let shared = SettingsWindowController()
 
     init() {
-        // Plain hosting controller — `sizingOptions = []` looks like the cure
-        // for content-driven window resizing, but it blanks every
-        // NSTableView-backed List (sidebar included). Stability comes from the
-        // panes having stable ideal sizes instead.
+        // Default sizing options. The window stays put as long as every pane
+        // keeps a bounded ideal size — the render test in BeaconAppTests
+        // asserts that, because one unbounded child (a fixedSize'd long Text)
+        // once ballooned the window into a blank pane.
         let window = NSWindow(contentViewController: NSHostingController(rootView: SettingsView()))
         window.title = "Beacon"
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
@@ -81,38 +81,6 @@ private enum SettingsPane: String, CaseIterable, Identifiable {
     }
 }
 
-/// UI row for the symbol table. The rule cells keep the user's raw text —
-/// parsing happens on serialize, so half-typed numbers don't get clobbered
-/// mid-edit.
-private struct SymbolRow: Identifiable, Equatable {
-    let id = UUID()
-    var symbol: String
-    var inMenuBar: Bool
-    var percentText: String
-    var stepText: String
-
-    init(entry: SymbolTableEntry = SymbolTableEntry(symbol: "")) {
-        symbol = entry.symbol
-        inMenuBar = entry.inMenuBar
-        percentText = entry.alertPercent.flatMap(formatRuleValue) ?? ""
-        stepText = entry.boundaryStep.flatMap(formatRuleValue) ?? ""
-    }
-
-    var entry: SymbolTableEntry {
-        SymbolTableEntry(
-            symbol: symbol, inMenuBar: inMenuBar,
-            alertPercent: Self.parseRuleText(percentText),
-            boundaryStep: Self.parseRuleText(stepText)
-        )
-    }
-
-    static func parseRuleText(_ text: String) -> Double? {
-        let trimmed = text.trimmingCharacters(in: .whitespaces)
-        guard let value = Double(trimmed), value.isFinite, value > 0 else { return nil }
-        return value
-    }
-}
-
 struct SettingsView: View {
     @AppStorage(PreferenceKey.coins) private var coins = "BTC ETH NVDA QQQ"
     @AppStorage(PreferenceKey.alertRules) private var alertRules = ""
@@ -158,78 +126,11 @@ struct SettingsView: View {
     }
 
     private var symbolsPane: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                Text("Symbol").frame(maxWidth: .infinity, alignment: .leading)
-                Text("Menu Bar").frame(width: 64)
-                Text("Alert %").frame(width: 72)
-                Text("Step").frame(width: 84)
-                // ⊖ column spacer — NOT Color.clear, which has unbounded
-                // height and would stretch the header to fill the pane.
-                Spacer().frame(width: 20)
-            }
-            .font(.callout)
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 16)
-
-            // No row selection: a selectable List swallows the first click,
-            // so the text fields would never get focus and the table reads as
-            // display-only. Rows delete via their own ⊖ instead.
-            List {
-                ForEach($symbolRows) { $row in
-                    HStack(spacing: 8) {
-                        TextField("Symbol", text: $row.symbol, prompt: Text("SYMBOL"))
-                            .textFieldStyle(.plain)
-                            .frame(maxWidth: .infinity)
-                        Toggle("In menu bar", isOn: $row.inMenuBar)
-                            .labelsHidden()
-                            .toggleStyle(.checkbox)
-                            .frame(width: 64)
-                        ruleField("Alert %", text: $row.percentText, width: 72)
-                        ruleField("Step", text: $row.stepText, width: 84)
-                        Button {
-                            symbolRows.removeAll { $0.id == row.id }
-                        } label: {
-                            Image(systemName: "minus.circle.fill")
-                                .foregroundStyle(.secondary)
-                        }
-                        .buttonStyle(.borderless)
-                        .frame(width: 20)
-                    }
-                }
-                .onMove { symbolRows.move(fromOffsets: $0, toOffset: $1) }
-            }
-            .listStyle(.bordered)
-            .alternatingRowBackgrounds()
-            // Fixed, not row-count-based: a height that moves with every
-            // add/remove changes the pane's ideal size, and the hosting view
-            // chases that by resizing (and so moving) the window.
-            .frame(height: 300)
-
-            Button(action: addSymbolRow) { Image(systemName: "plus") }
-                .buttonStyle(.borderless)
-
-            Text("Checked symbols cycle through the menu-bar title; unchecked ones only appear in the dropdown. Drag rows to reorder. Alert % notifies when the price moves that percent since the last alert, Step when it crosses a multiple of that step — leave a cell empty for no alert.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .padding(20)
-        .onAppear(perform: loadSymbolRows)
-        .onChange(of: symbolRows) { _, rows in storeSymbolRows(rows) }
-    }
-
-    /// A rule cell: free text, red while it holds something that isn't a
-    /// positive number (which serializes as "no rule").
-    private func ruleField(_ title: String, text: Binding<String>, width: CGFloat) -> some View {
-        let invalid = SymbolRow.parseRuleText(text.wrappedValue) == nil
-            && !text.wrappedValue.trimmingCharacters(in: .whitespaces).isEmpty
-        return TextField(title, text: text, prompt: Text("—"))
-            .textFieldStyle(.plain)
-            .multilineTextAlignment(.trailing)
-            .foregroundStyle(invalid ? Color.red : Color.primary)
-            .frame(width: width)
+        SymbolTableEditor(rows: $symbolRows)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .padding(20)
+            .onAppear(perform: loadSymbolRows)
+            .onChange(of: symbolRows) { _, rows in storeSymbolRows(rows) }
     }
 
     private func loadSymbolRows() {
@@ -243,10 +144,6 @@ struct SettingsView: View {
         if coins != strings.coins { coins = strings.coins }
         if alertRules != strings.alertRules { alertRules = strings.alertRules }
         if integerAlertRules != strings.integerAlertRules { integerAlertRules = strings.integerAlertRules }
-    }
-
-    private func addSymbolRow() {
-        symbolRows.append(SymbolRow())
     }
 
     private var alertsPane: some View {
