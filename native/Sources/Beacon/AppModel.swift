@@ -28,13 +28,7 @@ final class AppModel: ObservableObject {
     private var scheduledInterval: TimeInterval = 0
     private var started = false
 
-    var menuBarTitle: String {
-        guard !recentAlerts.isEmpty else { return menu.title }
-        let indicator = recentAlerts.values.contains { $0.direction == .down } ? "🔴" : "🟢"
-        return "\(indicator) \(menu.title)"
-    }
-
-    /// Idempotent: SwiftUI may re-create the menu-bar label view.
+    /// Idempotent: the caller may re-run this on a rebuilt menu bar.
     func start() {
         guard !started else { return }
         started = true
