@@ -164,7 +164,9 @@ struct SettingsView: View {
                 Text("Menu Bar").frame(width: 64)
                 Text("Alert %").frame(width: 72)
                 Text("Step").frame(width: 84)
-                Color.clear.frame(width: 20)
+                // ⊖ column spacer — NOT Color.clear, which has unbounded
+                // height and would stretch the header to fill the pane.
+                Spacer().frame(width: 20)
             }
             .font(.callout)
             .foregroundStyle(.secondary)
