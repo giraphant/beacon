@@ -122,14 +122,19 @@ final class AppModel: ObservableObject {
             )
             lastGood = result
             displayed = result
-            await runAlerts(
-                preferences: preferences,
-                percentRules: percentRules.rules,
-                integerRules: integerRules.rules,
-                cooldownMs: cooldownMs,
-                quotes: result.quotes,
-                now: now
-            )
+            // Settings changed while this fetch was in flight: these quotes were
+            // taken under rules the user has since replaced, and the requeued
+            // refresh will re-evaluate them under the new ones.
+            if Preferences.load() == preferences {
+                await runAlerts(
+                    preferences: preferences,
+                    percentRules: percentRules.rules,
+                    integerRules: integerRules.rules,
+                    cooldownMs: cooldownMs,
+                    quotes: result.quotes,
+                    now: now
+                )
+            }
         } catch {
             let message = quoteErrorMessage(error)
             if var cached = lastGood {

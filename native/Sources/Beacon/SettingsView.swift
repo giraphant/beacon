@@ -54,7 +54,8 @@ struct SettingsView: View {
     @AppStorage(PreferenceKey.alertSoundEnabled) private var alertSoundEnabled = false
 
     @State private var relayToken = ""
-    @State private var tokenWrite: Task<Void, Never>?
+    @State private var tokenError: String?
+    @State private var credentialsDebounce: Task<Void, Never>?
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
@@ -89,19 +90,33 @@ struct SettingsView: View {
                 }
                 if source == QuoteSourceKind.relay.rawValue {
                     TextField("Relay URL", text: $relayURL)
-                    // Rewriting the keychain item per keystroke means a dozen
-                    // writes to type one token, so wait for a pause — then tell
-                    // the model, which has no other way to hear about it.
+                    // The keychain write is local and cheap, so it happens per
+                    // keystroke — debouncing it would simply drop the last edit
+                    // if the window closed or the app quit inside the wait. Only
+                    // the refresh is worth waiting for a pause on, and the model
+                    // has no other way to hear about a keychain change.
                     SecureField("Relay token", text: $relayToken)
                         .onChange(of: relayToken) { _, token in
-                            tokenWrite?.cancel()
-                            tokenWrite = Task {
+                            guard token != Keychain.read(PreferenceKey.relayToken) ?? "" else { return }
+                            guard Keychain.write(token, account: PreferenceKey.relayToken) else {
+                                // Refreshing now would just re-send the old
+                                // token and blame the relay for rejecting it.
+                                tokenError = "Could not save the token to your keychain."
+                                return
+                            }
+                            tokenError = nil
+                            credentialsDebounce?.cancel()
+                            credentialsDebounce = Task {
                                 try? await Task.sleep(for: .milliseconds(800))
                                 guard !Task.isCancelled else { return }
-                                Keychain.write(token, account: PreferenceKey.relayToken)
                                 AppModel.shared.credentialsChanged()
                             }
                         }
+                    if let tokenError {
+                        Text(tokenError)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
                 }
                 Stepper("Refresh every \(refreshSeconds)s", value: $refreshSeconds, in: 5...600, step: 5)
             }
