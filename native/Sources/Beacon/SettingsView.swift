@@ -185,6 +185,7 @@ struct SettingsView: View {
             .listStyle(.bordered)
             .alternatingRowBackgrounds()
             .onDeleteCommand(perform: removeSelectedSymbolRow)
+            .frame(height: symbolTableHeight)
 
             HStack(spacing: 12) {
                 Button(action: addSymbolRow) { Image(systemName: "plus") }
@@ -197,10 +198,18 @@ struct SettingsView: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+
+            Spacer(minLength: 0)
         }
         .padding(20)
         .onAppear(perform: loadSymbolRows)
         .onChange(of: symbolRows) { _, rows in storeSymbolRows(rows) }
+    }
+
+    /// Hug the row count instead of flooding a tall window with empty
+    /// alternating stripes; past 12 rows the table scrolls.
+    private var symbolTableHeight: CGFloat {
+        CGFloat(min(max(symbolRows.count, 3), 12)) * 26 + 12
     }
 
     /// A rule cell: free text, red while it holds something that isn't a
