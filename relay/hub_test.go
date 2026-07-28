@@ -82,10 +82,12 @@ func TestHubMergesDeltaAndPrefersFreshSource(t *testing.T) {
 		t.Fatalf("unexpected merged quote: %+v", quotes["BTC"])
 	}
 
-	h.setConnected("bybit-linear", false)
+	now = now.Add(freshQuoteAge + time.Second)
+	binancePrice = 103
+	h.updateQuote("binance-futures", quoteUpdate{symbol: "BTC", price: &binancePrice, high24h: &binanceHigh, low24h: &binanceLow})
 	quotes, _ = h.selectQuotes([]string{"BTC"})
 	if quotes["BTC"].Source != "binance-futures" || quotes["BTC"].Stale {
-		t.Fatalf("fresh fallback=%+v", quotes["BTC"])
+		t.Fatalf("fresh lower-priority fallback=%+v", quotes["BTC"])
 	}
 
 	h.setConnected("binance-futures", false)
@@ -98,6 +100,92 @@ func TestHubMergesDeltaAndPrefersFreshSource(t *testing.T) {
 	quotes, missing = h.selectQuotes([]string{"BTC"})
 	if len(quotes) != 0 || len(missing) != 1 {
 		t.Fatalf("expired quotes=%v missing=%v", quotes, missing)
+	}
+}
+
+func TestHubTreatsUnchangedSymbolObservationAsFresh(t *testing.T) {
+	now := time.Unix(3000, 0)
+	h := newHub([]string{"bybit-linear"}, func() time.Time { return now })
+	h.setConnected("bybit-linear", true)
+
+	price, high, low := 100.0, 110.0, 90.0
+	if !h.updateQuote("bybit-linear", quoteUpdate{symbol: "BTC", price: &price, high24h: &high, low24h: &low}) {
+		t.Fatal("initial quote rejected")
+	}
+	initial, _ := h.selectQuotes([]string{"BTC"})
+	initialUpdatedAt := initial["BTC"].UpdatedAt
+
+	now = now.Add(freshQuoteAge + time.Second)
+	if !h.updateQuote("bybit-linear", quoteUpdate{symbol: "BTC"}) {
+		t.Fatal("valid unchanged-symbol observation rejected")
+	}
+
+	quotes, missing := h.selectQuotes([]string{"BTC"})
+	if len(missing) != 0 || quotes["BTC"].Stale {
+		t.Fatalf("quiet symbol should remain fresh: quote=%+v missing=%v", quotes["BTC"], missing)
+	}
+	if quotes["BTC"].Price != price || quotes["BTC"].High24h != high || quotes["BTC"].Low24h != low {
+		t.Fatalf("unchanged observation altered values: %+v", quotes["BTC"])
+	}
+	if quotes["BTC"].UpdatedAt != now.UnixMilli() || quotes["BTC"].UpdatedAt == initialUpdatedAt {
+		t.Fatalf("updatedAt=%d, want latest observation time %d", quotes["BTC"].UpdatedAt, now.UnixMilli())
+	}
+
+	h.setConnected("bybit-linear", false)
+	quotes, missing = h.selectQuotes([]string{"BTC"})
+	if len(missing) != 0 || !quotes["BTC"].Stale {
+		t.Fatalf("disconnected quote should be bounded stale cache: quote=%+v missing=%v", quotes["BTC"], missing)
+	}
+
+	now = now.Add(maxQuoteAge + time.Second)
+	quotes, missing = h.selectQuotes([]string{"BTC"})
+	if len(quotes) != 0 || len(missing) != 1 {
+		t.Fatalf("expired observed state must be excluded: quotes=%v missing=%v", quotes, missing)
+	}
+}
+
+func TestHubRequiresCompleteStateAfterReconnectForFreshness(t *testing.T) {
+	now := time.Unix(3500, 0)
+	h := newHub([]string{"bybit-linear"}, func() time.Time { return now })
+	h.setConnected("bybit-linear", true)
+
+	price, high, low := 100.0, 110.0, 90.0
+	h.updateQuote("bybit-linear", quoteUpdate{symbol: "BTC", price: &price, high24h: &high, low24h: &low})
+
+	now = now.Add(time.Second)
+	h.setConnected("bybit-linear", false)
+	h.setConnected("bybit-linear", true)
+	quotes, missing := h.selectQuotes([]string{"BTC"})
+	if len(missing) != 0 || !quotes["BTC"].Stale {
+		t.Fatalf("pre-reconnect cache must remain stale: quote=%+v missing=%v", quotes["BTC"], missing)
+	}
+
+	previousQuote := quotes["BTC"]
+	partialPrice := 999.0
+	if !h.updateQuote("bybit-linear", quoteUpdate{symbol: "BTC", price: &partialPrice}) {
+		t.Fatal("post-reconnect partial observation rejected")
+	}
+	quotes, missing = h.selectQuotes([]string{"BTC"})
+	if len(missing) != 0 || !quotes["BTC"].Stale || quotes["BTC"] != previousQuote {
+		t.Fatalf("partial observation must not alter or refresh pre-reconnect state: quote=%+v missing=%v", quotes["BTC"], missing)
+	}
+
+	now = now.Add(maxQuoteAge + time.Second)
+	if !h.updateQuote("bybit-linear", quoteUpdate{symbol: "BTC"}) {
+		t.Fatal("late partial observation rejected")
+	}
+	quotes, missing = h.selectQuotes([]string{"BTC"})
+	if len(quotes) != 0 || len(missing) != 1 {
+		t.Fatalf("partial observations must not extend expired pre-reconnect state: quotes=%v missing=%v", quotes, missing)
+	}
+
+	price, high, low = 101, 111, 91
+	if !h.updateQuote("bybit-linear", quoteUpdate{symbol: "BTC", price: &price, high24h: &high, low24h: &low}) {
+		t.Fatal("post-reconnect complete state rejected")
+	}
+	quotes, missing = h.selectQuotes([]string{"BTC"})
+	if len(missing) != 0 || quotes["BTC"].Stale {
+		t.Fatalf("complete post-reconnect state should restore freshness: quote=%+v missing=%v", quotes["BTC"], missing)
 	}
 }
 

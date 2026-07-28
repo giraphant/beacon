@@ -8,7 +8,9 @@ Enabled by default, in priority order:
 2. `binance-futures`
 3. `binance-spot`
 
-The relay prefers a fresh quote from any higher-priority source, then falls back to a lower-priority fresh quote. Only when no fresh quote exists does it return cache data up to 120 seconds old with `stale: true`.
+The relay prefers a fresh quote from any higher-priority source, then falls back to a lower-priority fresh quote. A quote is fresh only after all tracked fields for that symbol have been established on the source's current connection and the latest validated symbol-state observation is within 30 seconds. Only when no fresh quote exists does the relay return cache data for up to 120 seconds after the last validated symbol-state observation, with `stale: true`.
+
+`updatedAt` is the relay receipt time of the latest validated ticker observation that safely confirms the retained symbol state, not an exchange trade timestamp. After the current connection has established the tracked state, a valid Bybit delta that omits `lastPrice`, `highPrice24h`, and `lowPrice24h` advances `updatedAt` while retaining those values because omitted delta fields are unchanged. A partial delta received before the current connection establishes all tracked fields does not refresh or extend pre-reconnect cache data.
 
 ## Requirements
 

@@ -11,7 +11,7 @@ import (
 
 const (
 	binanceFuturesCatalog = "https://fapi.binance.com/fapi/v1/exchangeInfo"
-	binanceFuturesWS      = "wss://fstream.binance.com/ws"
+	binanceFuturesWS      = "wss://fstream.binance.com/market/stream"
 	binanceSpotCatalog    = "https://api.binance.com/api/v3/exchangeInfo?symbolStatus=TRADING&showPermissionSets=false"
 	binanceSpotWS         = "wss://stream.binance.com:9443/ws"
 )
@@ -114,51 +114,107 @@ func (s *binanceStream) Read() (*quoteUpdate, error) {
 }
 
 func parseBinanceMessage(data []byte) (*quoteUpdate, error) {
-	var envelope struct {
-		Event json.RawMessage `json:"e"`
-		Code  *int            `json:"code"`
-		Msg   string          `json:"msg"`
-	}
-	if err := json.Unmarshal(data, &envelope); err != nil {
+	fields, err := decodeBinanceObject(data)
+	if err != nil {
 		return nil, err
 	}
-	if envelope.Code != nil {
-		return nil, fmt.Errorf("binance subscription failed: %s (%d)", envelope.Msg, *envelope.Code)
-	}
-	if len(envelope.Event) == 0 {
-		return nil, nil
-	}
-	var event string
-	if err := json.Unmarshal(envelope.Event, &event); err != nil || event != "24hrTicker" {
-		return nil, nil
+	if streamRaw, ok := fields["stream"]; ok {
+		var stream string
+		if err := json.Unmarshal(streamRaw, &stream); err != nil {
+			return nil, fmt.Errorf("binance combined stream: %w", err)
+		}
+		if stream == "" {
+			return nil, nil
+		}
+		dataRaw, ok := fields["data"]
+		if !ok {
+			return nil, nil
+		}
+		fields, err = decodeBinanceObject(dataRaw)
+		if err != nil {
+			return nil, fmt.Errorf("binance combined data: %w", err)
+		}
+		if fields == nil {
+			return nil, nil
+		}
 	}
 
-	var message struct {
-		Symbol string `json:"s"`
-		Close  string `json:"c"`
-		High   string `json:"h"`
-		Low    string `json:"l"`
+	if codeRaw, ok := fields["code"]; ok {
+		var code int
+		if err := json.Unmarshal(codeRaw, &code); err != nil {
+			return nil, err
+		}
+		msg, err := binanceStringField(fields, "msg")
+		if err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("binance subscription failed: %s (%d)", msg, code)
 	}
-	if err := json.Unmarshal(data, &message); err != nil {
-		return nil, err
-	}
-	base, ok := baseFromUSDT(message.Symbol)
+
+	eventRaw, ok := fields["e"]
 	if !ok {
 		return nil, nil
 	}
-	price, err := requiredPositiveFloat(message.Close)
-	if err != nil {
-		return nil, fmt.Errorf("binance %s price: %w", message.Symbol, err)
+	var event string
+	if err := json.Unmarshal(eventRaw, &event); err != nil || event != "24hrTicker" {
+		return nil, nil
 	}
-	high, err := requiredPositiveFloat(message.High)
+
+	symbol, err := binanceStringField(fields, "s")
 	if err != nil {
-		return nil, fmt.Errorf("binance %s high: %w", message.Symbol, err)
+		return nil, err
 	}
-	low, err := requiredPositiveFloat(message.Low)
+	base, ok := baseFromUSDT(symbol)
+	if !ok {
+		return nil, nil
+	}
+	closeRaw, err := binanceStringField(fields, "c")
 	if err != nil {
-		return nil, fmt.Errorf("binance %s low: %w", message.Symbol, err)
+		return nil, err
+	}
+	highRaw, err := binanceStringField(fields, "h")
+	if err != nil {
+		return nil, err
+	}
+	lowRaw, err := binanceStringField(fields, "l")
+	if err != nil {
+		return nil, err
+	}
+	price, err := requiredPositiveFloat(closeRaw)
+	if err != nil {
+		return nil, fmt.Errorf("binance %s price: %w", symbol, err)
+	}
+	high, err := requiredPositiveFloat(highRaw)
+	if err != nil {
+		return nil, fmt.Errorf("binance %s high: %w", symbol, err)
+	}
+	low, err := requiredPositiveFloat(lowRaw)
+	if err != nil {
+		return nil, fmt.Errorf("binance %s low: %w", symbol, err)
 	}
 	return &quoteUpdate{symbol: base, price: price, high24h: high, low24h: low}, nil
+}
+
+// Binance ticker payloads intentionally contain case-distinct keys such as e/E, c/C, and l/L.
+// A RawMessage map preserves exact JSON key matching; struct decoding does not.
+func decodeBinanceObject(data []byte) (map[string]json.RawMessage, error) {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return nil, err
+	}
+	return fields, nil
+}
+
+func binanceStringField(fields map[string]json.RawMessage, key string) (string, error) {
+	raw, ok := fields[key]
+	if !ok {
+		return "", nil
+	}
+	var value string
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return "", fmt.Errorf("binance field %q: %w", key, err)
+	}
+	return value, nil
 }
 
 func requiredPositiveFloat(raw string) (*float64, error) {

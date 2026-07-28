@@ -132,7 +132,8 @@ func parseBybitMessage(data []byte) (*quoteUpdate, error) {
 		RetMsg  string `json:"ret_msg"`
 		Op      string `json:"op"`
 		Topic   string `json:"topic"`
-		Data    struct {
+		Type    string `json:"type"`
+		Data    *struct {
 			Symbol       string `json:"symbol"`
 			LastPrice    string `json:"lastPrice"`
 			HighPrice24h string `json:"highPrice24h"`
@@ -145,7 +146,7 @@ func parseBybitMessage(data []byte) (*quoteUpdate, error) {
 	if message.Success != nil && !*message.Success {
 		return nil, fmt.Errorf("bybit %s failed: %s", message.Op, message.RetMsg)
 	}
-	if !strings.HasPrefix(message.Topic, "tickers.") {
+	if !strings.HasPrefix(message.Topic, "tickers.") || (message.Type != "snapshot" && message.Type != "delta") || message.Data == nil {
 		return nil, nil
 	}
 
@@ -170,7 +171,7 @@ func parseBybitMessage(data []byte) (*quoteUpdate, error) {
 	if err != nil {
 		return nil, fmt.Errorf("bybit %s lowPrice24h: %w", upstreamSymbol, err)
 	}
-	if price == nil && high == nil && low == nil {
+	if message.Type == "snapshot" && price == nil && high == nil && low == nil {
 		return nil, nil
 	}
 	return &quoteUpdate{symbol: base, price: price, high24h: high, low24h: low}, nil

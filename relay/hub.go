@@ -17,6 +17,8 @@ const (
 
 var errSymbolLimit = errors.New("instance symbol limit exceeded")
 
+// quoteUpdate is a validated per-symbol ticker observation. Nil value fields
+// mean that a delta omitted those fields; the symbol observation is still valid.
 type quoteUpdate struct {
 	symbol  string
 	price   *float64
@@ -25,10 +27,11 @@ type quoteUpdate struct {
 }
 
 type quoteRecord struct {
-	price     float64
-	high24h   float64
-	low24h    float64
-	updatedAt time.Time
+	price                float64
+	high24h              float64
+	low24h               float64
+	updatedAt            time.Time // relay receipt time of the latest validated symbol-state observation
+	connectionGeneration uint64    // source connection that established the retained tracked state
 }
 
 func (q quoteRecord) complete() bool {
@@ -45,12 +48,13 @@ type selectedQuote struct {
 }
 
 type sourceState struct {
-	catalogReady bool
-	catalog      map[string]struct{}
-	connected    bool
-	quotes       map[string]quoteRecord
-	lastMessage  time.Time
-	reconnects   uint64
+	catalogReady         bool
+	catalog              map[string]struct{}
+	connected            bool
+	connectionGeneration uint64
+	quotes               map[string]quoteRecord
+	lastMessage          time.Time
+	reconnects           uint64
 }
 
 type requestPlan struct {
@@ -166,6 +170,9 @@ func (h *hub) setConnected(source string, connected bool) {
 	state := h.sources[source]
 	if state.connected != connected {
 		state.connected = connected
+		if connected {
+			state.connectionGeneration++
+		}
 		h.signalLocked()
 	}
 }
@@ -187,14 +194,18 @@ func (h *hub) updateQuote(source string, update quoteUpdate) bool {
 	if update.symbol == "" || !validOptionalPrice(update.price) || !validOptionalPrice(update.high24h) || !validOptionalPrice(update.low24h) {
 		return false
 	}
-	if update.price == nil && update.high24h == nil && update.low24h == nil {
-		return false
-	}
 
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	state := h.sources[source]
 	record := state.quotes[update.symbol]
+	stateCurrent := record.complete() && record.connectionGeneration == state.connectionGeneration
+	completeUpdate := update.price != nil && update.high24h != nil && update.low24h != nil
+	if !stateCurrent && !completeUpdate {
+		// A partial delta cannot safely be merged across a connection boundary;
+		// retain the bounded pre-reconnect cache until complete current state arrives.
+		return true
+	}
 	if update.price != nil {
 		record.price = *update.price
 	}
@@ -205,6 +216,7 @@ func (h *hub) updateQuote(source string, update quoteUpdate) bool {
 		record.low24h = *update.low24h
 	}
 	record.updatedAt = h.now()
+	record.connectionGeneration = state.connectionGeneration
 	state.quotes[update.symbol] = record
 	h.signalLocked()
 	return true
@@ -284,7 +296,7 @@ func (h *hub) hasUsableQuotesLocked(symbols []string, now time.Time) bool {
 		usable := false
 		for _, source := range h.order {
 			record := h.sources[source].quotes[symbol]
-			if record.complete() && now.Sub(record.updatedAt) <= maxQuoteAge {
+			if record.complete() && quoteAge(record.updatedAt, now) <= maxQuoteAge {
 				usable = true
 				break
 			}
@@ -303,12 +315,9 @@ func (h *hub) selectQuoteLocked(symbol string, now time.Time, stalePass bool) (s
 		if !record.complete() {
 			continue
 		}
-		age := now.Sub(record.updatedAt)
-		if age < 0 {
-			age = 0
-		}
+		age := quoteAge(record.updatedAt, now)
 		if !stalePass {
-			if !state.connected || age > freshQuoteAge {
+			if !state.connected || record.connectionGeneration != state.connectionGeneration || age > freshQuoteAge {
 				continue
 			}
 		} else if age > maxQuoteAge {
@@ -324,6 +333,17 @@ func (h *hub) selectQuoteLocked(symbol string, now time.Time, stalePass bool) (s
 		}, true
 	}
 	return selectedQuote{}, false
+}
+
+func quoteAge(updatedAt, now time.Time) time.Duration {
+	if updatedAt.IsZero() {
+		return maxQuoteAge + time.Nanosecond
+	}
+	age := now.Sub(updatedAt)
+	if age < 0 {
+		return 0
+	}
+	return age
 }
 
 func (h *hub) signalLocked() {
