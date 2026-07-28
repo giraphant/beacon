@@ -92,46 +92,4 @@ final class PreferencesTests: XCTestCase {
             IntegerAlertRule(symbol: "BTC", step: 500),
         ])
     }
-
-    // MARK: - Symbol table
-
-    /// Orphan rules (JUP here) vanish on the way through the table — they
-    /// belonged to no watched symbol and never fired.
-    func testSymbolTableRoundTripsThroughStrings() {
-        let table = parseSymbolTable(
-            coins: "btc eth | NVDA",
-            alertRules: "BTC:1 NVDA:2.5",
-            integerAlertRules: "BTC:1000 JUP:0.05"
-        )
-        XCTAssertEqual(table, [
-            SymbolTableEntry(symbol: "BTC", inMenuBar: true, alertPercent: 1, boundaryStep: 1000),
-            SymbolTableEntry(symbol: "ETH", inMenuBar: true),
-            SymbolTableEntry(symbol: "NVDA", inMenuBar: false, alertPercent: 2.5),
-        ])
-
-        let strings = serializeSymbolTable(table)
-        XCTAssertEqual(strings.coins, "BTC ETH | NVDA")
-        XCTAssertEqual(strings.alertRules, "BTC:1 NVDA:2.5")
-        XCTAssertEqual(strings.integerAlertRules, "BTC:1000")
-    }
-
-    func testSerializeSkipsBlankAndDuplicateRowsAndKeepsDecimalSteps() {
-        let strings = serializeSymbolTable([
-            SymbolTableEntry(symbol: " jup ", inMenuBar: false, boundaryStep: 0.05),
-            SymbolTableEntry(symbol: "", alertPercent: 3),
-            SymbolTableEntry(symbol: "JUP", alertPercent: 9),
-        ])
-        XCTAssertEqual(strings.coins, "| JUP")
-        XCTAssertEqual(strings.alertRules, "")
-        XCTAssertEqual(strings.integerAlertRules, "JUP:0.05")
-    }
-
-    func testSerializeDropsNonPositiveAndVanishinglySmallValues() {
-        let strings = serializeSymbolTable([
-            SymbolTableEntry(symbol: "BTC", alertPercent: 0, boundaryStep: 1e-12)
-        ])
-        XCTAssertEqual(strings.coins, "BTC")
-        XCTAssertEqual(strings.alertRules, "")
-        XCTAssertEqual(strings.integerAlertRules, "")
-    }
 }

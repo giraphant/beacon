@@ -11,10 +11,6 @@ final class SettingsWindowController: NSWindowController {
     static let shared = SettingsWindowController()
 
     init() {
-        // Default sizing options. The window stays put as long as every pane
-        // keeps a bounded ideal size — the render test in BeaconAppTests
-        // asserts that, because one unbounded child (a fixedSize'd long Text)
-        // once ballooned the window into a blank pane.
         let window = NSWindow(contentViewController: NSHostingController(rootView: SettingsView()))
         window.title = "Beacon"
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
@@ -98,7 +94,6 @@ struct SettingsView: View {
     @State private var credentialsDebounce: Task<Void, Never>?
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var selectedPane: SettingsPane? = .symbols
-    @State private var symbolRows: [SymbolRow] = []
 
     var body: some View {
         NavigationSplitView {
@@ -126,48 +121,41 @@ struct SettingsView: View {
     }
 
     private var symbolsPane: some View {
-        SymbolTableEditor(rows: $symbolRows)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .padding(20)
-            .onAppear(perform: loadSymbolRows)
-            .onChange(of: symbolRows) { _, rows in storeSymbolRows(rows) }
-    }
-
-    private func loadSymbolRows() {
-        symbolRows = parseSymbolTable(
-            coins: coins, alertRules: alertRules, integerAlertRules: integerAlertRules
-        ).map(SymbolRow.init(entry:))
-    }
-
-    private func storeSymbolRows(_ rows: [SymbolRow]) {
-        let strings = serializeSymbolTable(rows.map(\.entry))
-        if coins != strings.coins { coins = strings.coins }
-        if alertRules != strings.alertRules { alertRules = strings.alertRules }
-        if integerAlertRules != strings.integerAlertRules { integerAlertRules = strings.integerAlertRules }
-    }
-
-    private var alertsPane: some View {
         Form {
             Section {
-                Stepper(
-                    "Boundary cooldown: \(cooldownMinutesBinding.wrappedValue) min",
-                    value: cooldownMinutesBinding, in: 0...240, step: 5
-                )
-                Text("Spaces out repeated boundary-crossing alerts. Per-symbol thresholds live in the Symbols table.")
+                TextField("Watchlist", text: $coins)
+                Text("Space separated. A `|` splits menu-bar symbols from dropdown-only ones: `BTC ETH | NVDA QQQ`.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
-                Toggle("Play sound", isOn: $alertSoundEnabled)
+            }
+
+            Section("Menu Bar") {
+                Toggle("Hide symbols in menu bar", isOn: $hideMenuBarSymbols)
+                Toggle("Hide currency symbol", isOn: $hideCurrencySymbol)
             }
         }
         .formStyle(.grouped)
     }
 
-    /// The preference stays a string (Raycast heritage); the stepper wants Int.
-    private var cooldownMinutesBinding: Binding<Int> {
-        Binding(
-            get: { Int(parseIntegerAlertCooldownMinutes(cooldownMinutes)) },
-            set: { cooldownMinutes = String($0) }
-        )
+    private var alertsPane: some View {
+        Form {
+            Section("Rules") {
+                TextField("Percent rules", text: $alertRules)
+                Text("`BTC:1 ETH:2` alerts when the price moves that percent from the last alert.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                TextField("Boundary rules", text: $integerAlertRules)
+                Text("`BTC:1000 JUP:0.05` alerts when the price crosses a multiple of that step.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                TextField("Boundary cooldown (minutes)", text: $cooldownMinutes)
+            }
+
+            Section {
+                Toggle("Play sound", isOn: $alertSoundEnabled)
+            }
+        }
+        .formStyle(.grouped)
     }
 
     private var sourcePane: some View {
@@ -224,11 +212,6 @@ struct SettingsView: View {
                     .onChange(of: launchAtLogin) { _, enabled in
                         setLaunchAtLogin(enabled)
                     }
-            }
-
-            Section("Menu Bar") {
-                Toggle("Hide symbols in menu bar", isOn: $hideMenuBarSymbols)
-                Toggle("Hide currency symbol", isOn: $hideCurrencySymbol)
             }
 
             Section("About") {
