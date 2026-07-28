@@ -18,10 +18,13 @@ final class SettingsWindowController: NSWindowController {
         window.toolbarStyle = .unified
         window.isReleasedWhenClosed = false
         // A hosting controller sizes the window to the SwiftUI content, and a
-        // Form has no width of its own — without this it opens at `minSize`.
-        window.setContentSize(NSSize(width: 520, height: 620))
-        window.minSize = NSSize(width: 440, height: 400)
-        window.setFrameAutosaveName("BeaconSettingsWindow")
+        // NavigationSplitView has no size of its own — without this it opens at
+        // `minSize`.
+        window.setContentSize(NSSize(width: 760, height: 540))
+        window.minSize = NSSize(width: 640, height: 420)
+        // Not the pre-sidebar autosave name: a frame saved by the old
+        // single-form window is too narrow for the split view.
+        window.setFrameAutosaveName("BeaconSettingsWindowSplit")
         super.init(window: window)
         window.center()
     }
@@ -41,6 +44,33 @@ final class SettingsWindowController: NSWindowController {
     }
 }
 
+private enum SettingsPane: String, CaseIterable, Identifiable {
+    case symbols
+    case alerts
+    case source
+    case general
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .symbols: "Symbols"
+        case .alerts: "Alerts"
+        case .source: "Source"
+        case .general: "General"
+        }
+    }
+
+    var symbolName: String {
+        switch self {
+        case .symbols: "chart.line.uptrend.xyaxis"
+        case .alerts: "bell"
+        case .source: "antenna.radiowaves.left.and.right"
+        case .general: "gearshape"
+        }
+    }
+}
+
 struct SettingsView: View {
     @AppStorage(PreferenceKey.coins) private var coins = "BTC ETH NVDA QQQ"
     @AppStorage(PreferenceKey.alertRules) private var alertRules = ""
@@ -57,19 +87,53 @@ struct SettingsView: View {
     @State private var tokenError: String?
     @State private var credentialsDebounce: Task<Void, Never>?
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
+    @State private var selectedPane: SettingsPane? = .symbols
 
     var body: some View {
+        NavigationSplitView {
+            List(SettingsPane.allCases, selection: $selectedPane) { pane in
+                Label(pane.title, systemImage: pane.symbolName)
+                    .tag(pane)
+            }
+            .listStyle(.sidebar)
+            .navigationSplitViewColumnWidth(min: 150, ideal: 170, max: 210)
+        } detail: {
+            detailView
+                .navigationTitle((selectedPane ?? .symbols).title)
+        }
+        .onAppear { relayToken = Keychain.read(PreferenceKey.relayToken) ?? "" }
+    }
+
+    @ViewBuilder
+    private var detailView: some View {
+        switch selectedPane ?? .symbols {
+        case .symbols: symbolsPane
+        case .alerts: alertsPane
+        case .source: sourcePane
+        case .general: generalPane
+        }
+    }
+
+    private var symbolsPane: some View {
         Form {
-            Section("Symbols") {
+            Section {
                 TextField("Watchlist", text: $coins)
                 Text("Space separated. A `|` splits menu-bar symbols from dropdown-only ones: `BTC ETH | NVDA QQQ`.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+
+            Section("Menu Bar") {
                 Toggle("Hide symbols in menu bar", isOn: $hideMenuBarSymbols)
                 Toggle("Hide currency symbol", isOn: $hideCurrencySymbol)
             }
+        }
+        .formStyle(.grouped)
+    }
 
-            Section("Alerts") {
+    private var alertsPane: some View {
+        Form {
+            Section("Rules") {
                 TextField("Percent rules", text: $alertRules)
                 Text("`BTC:1 ETH:2` alerts when the price moves that percent from the last alert.")
                     .font(.caption)
@@ -79,10 +143,18 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 TextField("Boundary cooldown (minutes)", text: $cooldownMinutes)
-                Toggle("Play sound", isOn: $alertSoundEnabled)
             }
 
-            Section("Source") {
+            Section {
+                Toggle("Play sound", isOn: $alertSoundEnabled)
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    private var sourcePane: some View {
+        Form {
+            Section("Quotes") {
                 Picker("Quotes from", selection: $source) {
                     ForEach(QuoteSourceKind.allCases) { kind in
                         Text(kind.rawValue).tag(kind.rawValue)
@@ -118,19 +190,34 @@ struct SettingsView: View {
                             .foregroundStyle(.red)
                     }
                 }
-                Stepper("Refresh every \(refreshSeconds)s", value: $refreshSeconds, in: 5...600, step: 5)
             }
 
             Section {
+                Stepper("Refresh every \(refreshSeconds)s", value: $refreshSeconds, in: 5...600, step: 5)
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    private var generalPane: some View {
+        Form {
+            Section("Startup") {
                 Toggle("Launch at login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, enabled in
                         setLaunchAtLogin(enabled)
                     }
             }
+
+            Section("About") {
+                LabeledContent("Version", value: Self.appVersion)
+            }
         }
         .formStyle(.grouped)
-        .onAppear { relayToken = Keychain.read(PreferenceKey.relayToken) ?? "" }
     }
+
+    /// "dev" outside a bundle (`swift run`), the Info.plist version inside one.
+    private static let appVersion =
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
 
     /// Registration needs a signed bundle; if it fails, snap the toggle back
     /// rather than showing a state the system does not actually have.

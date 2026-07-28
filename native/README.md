@@ -17,20 +17,33 @@ proxy itself.
 ## Build
 
 ```bash
-./build-app.sh              # → build/Beacon.app, ad-hoc signed
-open build/Beacon.app
+make build      # → .build/Beacon.app
+make run        # build + open
+make install    # → /Applications/Beacon.app
 ```
 
-Ad-hoc signing is enough for notifications and login-item registration, but the
+Signs with the `Developer ID Application` identity from `Makefile.local`
+(gitignored; see the Makefile header), ad-hoc otherwise. Ad-hoc works, but the
 signature changes on every rebuild, so macOS re-asks for keychain access (the
 relay token) each time.
+
+## Release
+
+```bash
+make release VERSION=1.0.0
+```
+
+Checks the version against `Resources/Info.plist`, builds a notarized DMG,
+publishes a GitHub Release, and bumps the `beacon` cask in
+`giraphant/homebrew-tap` — after which `brew upgrade --cask beacon` works.
+Same flow as veduta's.
 
 ## Test
 
 ```bash
-DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test
+make test       # DEVELOPER_DIR-wrapped swift test
 ```
 
-`XCTest` only ships inside Xcode.app; without `DEVELOPER_DIR` a
+`XCTest` only ships inside Xcode.app; without the `DEVELOPER_DIR` override a
 CommandLineTools-selected toolchain fails with `no such module 'XCTest'`.
 `swift build` needs no such override.
