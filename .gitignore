@@ -10,3 +10,6 @@ build/
 
 # OS
 .DS_Store
+
+# SwiftPM
+native/.build/
