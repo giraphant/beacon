@@ -77,6 +77,38 @@ private enum SettingsPane: String, CaseIterable, Identifiable {
     }
 }
 
+/// UI row for the symbol table. The rule cells keep the user's raw text —
+/// parsing happens on serialize, so half-typed numbers don't get clobbered
+/// mid-edit.
+private struct SymbolRow: Identifiable, Equatable {
+    let id = UUID()
+    var symbol: String
+    var inMenuBar: Bool
+    var percentText: String
+    var stepText: String
+
+    init(entry: SymbolTableEntry = SymbolTableEntry(symbol: "")) {
+        symbol = entry.symbol
+        inMenuBar = entry.inMenuBar
+        percentText = entry.alertPercent.flatMap(formatRuleValue) ?? ""
+        stepText = entry.boundaryStep.flatMap(formatRuleValue) ?? ""
+    }
+
+    var entry: SymbolTableEntry {
+        SymbolTableEntry(
+            symbol: symbol, inMenuBar: inMenuBar,
+            alertPercent: Self.parseRuleText(percentText),
+            boundaryStep: Self.parseRuleText(stepText)
+        )
+    }
+
+    static func parseRuleText(_ text: String) -> Double? {
+        let trimmed = text.trimmingCharacters(in: .whitespaces)
+        guard let value = Double(trimmed), value.isFinite, value > 0 else { return nil }
+        return value
+    }
+}
+
 struct SettingsView: View {
     @AppStorage(PreferenceKey.coins) private var coins = "BTC ETH NVDA QQQ"
     @AppStorage(PreferenceKey.alertRules) private var alertRules = ""
@@ -94,6 +126,8 @@ struct SettingsView: View {
     @State private var credentialsDebounce: Task<Void, Never>?
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var selectedPane: SettingsPane? = .symbols
+    @State private var symbolRows: [SymbolRow] = []
+    @State private var symbolSelection: SymbolRow.ID?
 
     var body: some View {
         NavigationSplitView {
@@ -121,41 +155,113 @@ struct SettingsView: View {
     }
 
     private var symbolsPane: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Text("Symbol").frame(maxWidth: .infinity, alignment: .leading)
+                Text("Menu Bar").frame(width: 64)
+                Text("Alert %").frame(width: 72)
+                Text("Step").frame(width: 84)
+            }
+            .font(.callout)
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 16)
+
+            List(selection: $symbolSelection) {
+                ForEach($symbolRows) { $row in
+                    HStack(spacing: 8) {
+                        TextField("Symbol", text: $row.symbol, prompt: Text("SYMBOL"))
+                            .textFieldStyle(.plain)
+                            .frame(maxWidth: .infinity)
+                        Toggle("In menu bar", isOn: $row.inMenuBar)
+                            .labelsHidden()
+                            .toggleStyle(.checkbox)
+                            .frame(width: 64)
+                        ruleField("Alert %", text: $row.percentText, width: 72)
+                        ruleField("Step", text: $row.stepText, width: 84)
+                    }
+                }
+                .onMove { symbolRows.move(fromOffsets: $0, toOffset: $1) }
+            }
+            .listStyle(.bordered)
+            .alternatingRowBackgrounds()
+            .onDeleteCommand(perform: removeSelectedSymbolRow)
+
+            HStack(spacing: 12) {
+                Button(action: addSymbolRow) { Image(systemName: "plus") }
+                Button(action: removeSelectedSymbolRow) { Image(systemName: "minus") }
+                    .disabled(symbolSelection == nil)
+            }
+            .buttonStyle(.borderless)
+
+            Text("Checked symbols cycle through the menu-bar title; unchecked ones only appear in the dropdown. Drag rows to reorder. Alert % notifies when the price moves that percent since the last alert, Step when it crosses a multiple of that step — leave a cell empty for no alert.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(20)
+        .onAppear(perform: loadSymbolRows)
+        .onChange(of: symbolRows) { _, rows in storeSymbolRows(rows) }
+    }
+
+    /// A rule cell: free text, red while it holds something that isn't a
+    /// positive number (which serializes as "no rule").
+    private func ruleField(_ title: String, text: Binding<String>, width: CGFloat) -> some View {
+        let invalid = SymbolRow.parseRuleText(text.wrappedValue) == nil
+            && !text.wrappedValue.trimmingCharacters(in: .whitespaces).isEmpty
+        return TextField(title, text: text, prompt: Text("—"))
+            .textFieldStyle(.plain)
+            .multilineTextAlignment(.trailing)
+            .foregroundStyle(invalid ? Color.red : Color.primary)
+            .frame(width: width)
+    }
+
+    private func loadSymbolRows() {
+        symbolRows = parseSymbolTable(
+            coins: coins, alertRules: alertRules, integerAlertRules: integerAlertRules
+        ).map(SymbolRow.init(entry:))
+    }
+
+    private func storeSymbolRows(_ rows: [SymbolRow]) {
+        let strings = serializeSymbolTable(rows.map(\.entry))
+        if coins != strings.coins { coins = strings.coins }
+        if alertRules != strings.alertRules { alertRules = strings.alertRules }
+        if integerAlertRules != strings.integerAlertRules { integerAlertRules = strings.integerAlertRules }
+    }
+
+    private func addSymbolRow() {
+        let row = SymbolRow()
+        symbolRows.append(row)
+        symbolSelection = row.id
+    }
+
+    private func removeSelectedSymbolRow() {
+        guard let selection = symbolSelection else { return }
+        symbolRows.removeAll { $0.id == selection }
+        symbolSelection = nil
+    }
+
+    private var alertsPane: some View {
         Form {
             Section {
-                TextField("Watchlist", text: $coins)
-                Text("Space separated. A `|` splits menu-bar symbols from dropdown-only ones: `BTC ETH | NVDA QQQ`.")
+                Stepper(
+                    "Boundary cooldown: \(cooldownMinutesBinding.wrappedValue) min",
+                    value: cooldownMinutesBinding, in: 0...240, step: 5
+                )
+                Text("Spaces out repeated boundary-crossing alerts. Per-symbol thresholds live in the Symbols table.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
-            }
-
-            Section("Menu Bar") {
-                Toggle("Hide symbols in menu bar", isOn: $hideMenuBarSymbols)
-                Toggle("Hide currency symbol", isOn: $hideCurrencySymbol)
+                Toggle("Play sound", isOn: $alertSoundEnabled)
             }
         }
         .formStyle(.grouped)
     }
 
-    private var alertsPane: some View {
-        Form {
-            Section("Rules") {
-                TextField("Percent rules", text: $alertRules)
-                Text("`BTC:1 ETH:2` alerts when the price moves that percent from the last alert.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                TextField("Boundary rules", text: $integerAlertRules)
-                Text("`BTC:1000 JUP:0.05` alerts when the price crosses a multiple of that step.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                TextField("Boundary cooldown (minutes)", text: $cooldownMinutes)
-            }
-
-            Section {
-                Toggle("Play sound", isOn: $alertSoundEnabled)
-            }
-        }
-        .formStyle(.grouped)
+    /// The preference stays a string (Raycast heritage); the stepper wants Int.
+    private var cooldownMinutesBinding: Binding<Int> {
+        Binding(
+            get: { Int(parseIntegerAlertCooldownMinutes(cooldownMinutes)) },
+            set: { cooldownMinutes = String($0) }
+        )
     }
 
     private var sourcePane: some View {
@@ -212,6 +318,11 @@ struct SettingsView: View {
                     .onChange(of: launchAtLogin) { _, enabled in
                         setLaunchAtLogin(enabled)
                     }
+            }
+
+            Section("Menu Bar") {
+                Toggle("Hide symbols in menu bar", isOn: $hideMenuBarSymbols)
+                Toggle("Hide currency symbol", isOn: $hideCurrencySymbol)
             }
 
             Section("About") {
