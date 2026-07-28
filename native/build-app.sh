@@ -38,11 +38,14 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundleVersion</key><string>1</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSUIElement</key><true/>
-  <!-- The relay is self-hosted and commonly plain HTTP on the LAN, which App
-       Transport Security blocks. Scoped to local networking rather than
-       NSAllowsArbitraryLoads, so the exchange endpoints stay TLS-only. -->
-  <key>NSAppTransportSecurity</key>
-  <dict><key>NSAllowsLocalNetworking</key><true/></dict>
+  <!-- No ATS exemption: the exchanges and the relay are HTTPS, and the only
+       thing an exemption buys is plain HTTP, so adding one would weaken TLS
+       enforcement for nothing. Reaching a relay by LAN address is a separate
+       gate — macOS 15 wants Local Network permission for that, and a refusal
+       reads as a -1001 timeout rather than a permission error, so the string
+       below is what tells you which app is asking and why. -->
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>Beacon needs this to reach a quote relay on your local network.</string>
 </dict>
 </plist>
 PLIST
