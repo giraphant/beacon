@@ -111,7 +111,7 @@ final class AppModel: ObservableObject {
                 relayURL: preferences.relayURL,
                 // Only the relay source sends it; an exchange user should never
                 // see a keychain prompt for a credential nothing reads.
-                relayToken: preferences.source == .relay ? Keychain.read(PreferenceKey.relayToken) : nil,
+                relayToken: preferences.source == .relay ? await Keychain.read(PreferenceKey.relayToken) : nil,
                 now: now
             )
             lastGood = result

@@ -99,7 +99,7 @@ func formatNumberKey(_ value: Double) -> String {
 /// it lives in the keychain instead.
 @MainActor
 enum Keychain {
-    private static let service = "com.inol.beacon"
+    nonisolated private static let service = "com.inol.beacon"
 
     /// Every `SecItemCopyMatching` can raise the access prompt, so reading once
     /// per refresh means a dialog every 30s on a bundle whose signature macOS
@@ -107,14 +107,20 @@ enum Keychain {
     /// the only thing that can invalidate it.
     private static var cache: [String: String?] = [:]
 
-    static func read(_ account: String) -> String? {
+    /// Off the main thread, always. A `SecItem*` call blocks until the user
+    /// answers the access dialog — and that dialog cannot be drawn while the
+    /// main thread is the thing waiting for it, so calling this synchronously
+    /// deadlocks the app on launch: the run loop never turns, the status item
+    /// keeps its empty title, and macOS eventually tears down the unresponsive
+    /// menu bar scene. Symptom is an app that runs with no icon and no crash.
+    static func read(_ account: String) async -> String? {
         if let cached = cache[account] { return cached }
-        let value = load(account)
+        let value = await Task.detached(priority: .utility) { load(account) }.value
         cache[account] = value
         return value
     }
 
-    private static func load(_ account: String) -> String? {
+    nonisolated private static func load(_ account: String) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -134,7 +140,14 @@ enum Keychain {
     /// keychain has actually taken the value, so a failure cannot leave the app
     /// authenticating with a token that was never stored.
     @discardableResult
-    static func write(_ value: String, account: String) -> Bool {
+    static func write(_ value: String, account: String) async -> Bool {
+        let saved = await Task.detached(priority: .utility) { store(value, account) }.value
+        guard saved else { return false }
+        cache[account] = value.isEmpty ? String?.none : value
+        return true
+    }
+
+    nonisolated private static func store(_ value: String, _ account: String) -> Bool {
         let base: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -143,9 +156,7 @@ enum Keychain {
 
         guard !value.isEmpty else {
             let status = SecItemDelete(base as CFDictionary)
-            guard status == errSecSuccess || status == errSecItemNotFound else { return false }
-            cache[account] = String?.none
-            return true
+            return status == errSecSuccess || status == errSecItemNotFound
         }
 
         let data = Data(value.utf8)
@@ -156,8 +167,6 @@ enum Keychain {
             insert[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
             status = SecItemAdd(insert as CFDictionary, nil)
         }
-        guard status == errSecSuccess else { return false }
-        cache[account] = value
-        return true
+        return status == errSecSuccess
     }
 }

@@ -92,6 +92,10 @@ struct SettingsView: View {
     @State private var relayToken = ""
     @State private var tokenError: String?
     @State private var credentialsDebounce: Task<Void, Never>?
+    /// Keychain writes are async now, so each keystroke's write is chained onto
+    /// the previous one — left to run concurrently they can land out of order
+    /// and persist a token the user has already typed past.
+    @State private var tokenWrite: Task<Void, Never>?
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var selectedPane: SettingsPane? = .symbols
 
@@ -107,7 +111,7 @@ struct SettingsView: View {
             detailView
                 .navigationTitle((selectedPane ?? .symbols).title)
         }
-        .onAppear { relayToken = Keychain.read(PreferenceKey.relayToken) ?? "" }
+        .task { relayToken = await Keychain.read(PreferenceKey.relayToken) ?? "" }
     }
 
     @ViewBuilder
@@ -175,19 +179,23 @@ struct SettingsView: View {
                     // has no other way to hear about a keychain change.
                     SecureField("Relay token", text: $relayToken)
                         .onChange(of: relayToken) { _, token in
-                            guard token != Keychain.read(PreferenceKey.relayToken) ?? "" else { return }
-                            guard Keychain.write(token, account: PreferenceKey.relayToken) else {
-                                // Refreshing now would just re-send the old
-                                // token and blame the relay for rejecting it.
-                                tokenError = "Could not save the token to your keychain."
-                                return
-                            }
-                            tokenError = nil
-                            credentialsDebounce?.cancel()
-                            credentialsDebounce = Task {
-                                try? await Task.sleep(for: .milliseconds(800))
-                                guard !Task.isCancelled else { return }
-                                AppModel.shared.credentialsChanged()
+                            tokenWrite = Task { [previous = tokenWrite] in
+                                await previous?.value
+                                let stored = await Keychain.read(PreferenceKey.relayToken) ?? ""
+                                guard token != stored else { return }
+                                guard await Keychain.write(token, account: PreferenceKey.relayToken) else {
+                                    // Refreshing now would just re-send the old
+                                    // token and blame the relay for rejecting it.
+                                    tokenError = "Could not save the token to your keychain."
+                                    return
+                                }
+                                tokenError = nil
+                                credentialsDebounce?.cancel()
+                                credentialsDebounce = Task {
+                                    try? await Task.sleep(for: .milliseconds(800))
+                                    guard !Task.isCancelled else { return }
+                                    AppModel.shared.credentialsChanged()
+                                }
                             }
                         }
                     if let tokenError {
