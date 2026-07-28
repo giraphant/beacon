@@ -11,12 +11,11 @@ final class SettingsWindowController: NSWindowController {
     static let shared = SettingsWindowController()
 
     init() {
-        let host = NSHostingController(rootView: SettingsView())
-        // Never let SwiftUI's ideal size drive the window: with a content-
-        // sized table inside, every row add/remove would resize — and, since
-        // AppKit anchors at the bottom-left, visually move — the window.
-        host.sizingOptions = []
-        let window = NSWindow(contentViewController: host)
+        // Plain hosting controller — `sizingOptions = []` looks like the cure
+        // for content-driven window resizing, but it blanks every
+        // NSTableView-backed List (sidebar included). Stability comes from the
+        // panes having stable ideal sizes instead.
+        let window = NSWindow(contentViewController: NSHostingController(rootView: SettingsView()))
         window.title = "Beacon"
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
         window.titlebarAppearsTransparent = true
@@ -200,7 +199,10 @@ struct SettingsView: View {
             }
             .listStyle(.bordered)
             .alternatingRowBackgrounds()
-            .frame(height: symbolTableHeight)
+            // Fixed, not row-count-based: a height that moves with every
+            // add/remove changes the pane's ideal size, and the hosting view
+            // chases that by resizing (and so moving) the window.
+            .frame(height: 300)
 
             Button(action: addSymbolRow) { Image(systemName: "plus") }
                 .buttonStyle(.borderless)
@@ -209,18 +211,11 @@ struct SettingsView: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-
-            Spacer(minLength: 0)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(20)
         .onAppear(perform: loadSymbolRows)
         .onChange(of: symbolRows) { _, rows in storeSymbolRows(rows) }
-    }
-
-    /// Hug the row count instead of flooding a tall window with empty
-    /// alternating stripes; past 12 rows the table scrolls.
-    private var symbolTableHeight: CGFloat {
-        CGFloat(min(max(symbolRows.count, 3), 12)) * 26 + 12
     }
 
     /// A rule cell: free text, red while it holds something that isn't a
