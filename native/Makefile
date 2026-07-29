@@ -43,10 +43,10 @@ build:
 	@cp $(RELEASE_DIR)/$(APP_NAME) $(APP_BUNDLE)/Contents/MacOS/$(APP_NAME)
 	@cp Resources/Info.plist $(APP_BUNDLE)/Contents/Info.plist
 	@# The icon only shows on notification banners — LSUIElement means no Dock
-	@# tile. Built from the extension icon at build time to keep .icns out of git.
+	@# tile. Built from the source PNG to keep .icns out of git.
 	@iconset=$$(mktemp -d)/AppIcon.iconset; mkdir -p "$$iconset"; \
-	sips -z 512 512 ../assets/command-icon.png --out "$$iconset/icon_512x512.png" >/dev/null; \
-	sips -z 1024 1024 ../assets/command-icon.png --out "$$iconset/icon_512x512@2x.png" >/dev/null; \
+	sips -z 512 512 Resources/command-icon.png --out "$$iconset/icon_512x512.png" >/dev/null; \
+	sips -z 1024 1024 Resources/command-icon.png --out "$$iconset/icon_512x512@2x.png" >/dev/null; \
 	iconutil -c icns "$$iconset" -o $(APP_BUNDLE)/Contents/Resources/AppIcon.icns
 	@if security find-identity -v -p codesigning | grep -F "$(CODESIGN_IDENTITY)" >/dev/null 2>&1; then \
 		codesign --force $(CODESIGN_OPTIONS) --sign "$(CODESIGN_IDENTITY)" $(APP_BUNDLE); \

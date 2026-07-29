@@ -7,7 +7,7 @@ node + React + `@raycast/api` process on every `interval` tick, ~0.5 CPU-seconds
 each. At a 30s refresh that is ~40 CPU-minutes/day regardless of what the
 command does. A resident process pays that cost once.
 
-`Sources/BeaconCore` is a straight port of the pure logic in `../src`
+`Sources/BeaconCore` is a straight port of the pure logic in `../Legacy/src`
 (formatting, preference parsing, both alert evaluators, the menu model, quote
 fetching + fallback) with its tests; `Sources/Beacon` is the app shell.
 Dropped as Raycast-only workarounds: the quote cache, the fresh-quote alert
