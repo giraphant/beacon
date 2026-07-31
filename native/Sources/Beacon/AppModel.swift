@@ -10,10 +10,15 @@ final class AppModel: ObservableObject {
     static let shared = AppModel()
 
     @Published private(set) var menu = MenuBarModel(title: "Beacon", isLoading: true, items: [], sections: [])
-    @Published private(set) var recentAlerts: [String: RecentAlert] = [:]
+    @Published private(set) var recentAlerts: [RecentAlert] = []
+    @Published private(set) var notificationSettings = NotificationSettingsSnapshot.loading
+    @Published private(set) var lastNotificationDeliveryError: String?
 
     private let stateStore = AlertStateStore()
     private let diagnostics = QuoteDiagnosticLogger.shared
+    private let alertHUD = AlertHUDController.shared
+    private let notificationCenter = UNUserNotificationCenter.current()
+    private let notificationPresentationDelegate = NotificationPresentationDelegate()
     private var timer: Timer?
     private var refreshTask: Task<Void, Never>?
     private var refreshPending = false
@@ -28,13 +33,19 @@ final class AppModel: ObservableObject {
     private var lastPreferences: Preferences?
     private var scheduledInterval: TimeInterval = 0
     private var started = false
+    private let maximumRecentAlerts = 10
 
     /// Idempotent: the caller may re-run this on a rebuilt menu bar.
     func start() {
         guard !started else { return }
         started = true
         UserDefaults.standard.register(defaults: Preferences.defaults)
-        requestNotificationAuthorization()
+        notificationCenter.delegate = notificationPresentationDelegate
+        Task { [weak self] in
+            await self?.refreshNotificationSettings(
+                requestIfNeeded: Preferences.load().systemNotificationsEnabled
+            )
+        }
         NotificationCenter.default.addObserver(
             forName: UserDefaults.didChangeNotification,
             object: UserDefaults.standard,
@@ -71,7 +82,54 @@ final class AppModel: ObservableObject {
     }
 
     func dismissAlerts() {
-        recentAlerts = [:]
+        recentAlerts = []
+    }
+
+    func refreshNotificationSettings(requestIfNeeded: Bool = false) async {
+        guard Bundle.main.bundleIdentifier != nil else {
+            notificationSettings = .unavailable
+            return
+        }
+
+        var settings = await notificationCenter.notificationSettings()
+        if requestIfNeeded, settings.authorizationStatus == .notDetermined {
+            do {
+                _ = try await notificationCenter.requestAuthorization(options: [.alert, .sound])
+                lastNotificationDeliveryError = nil
+            } catch {
+                lastNotificationDeliveryError = error.localizedDescription
+            }
+            settings = await notificationCenter.notificationSettings()
+        }
+        notificationSettings = NotificationSettingsSnapshot(settings)
+    }
+
+    func sendTestNotification() async -> Bool {
+        lastNotificationDeliveryError = nil
+        await refreshNotificationSettings()
+        guard notificationSettings.canSendTest else {
+            lastNotificationDeliveryError =
+                notificationSettings.explanation ?? "Notification banners are not available."
+            return false
+        }
+
+        do {
+            try await enqueueNotification(
+                title: "Beacon test notification",
+                body: "Price alerts will appear like this."
+            )
+            return true
+        } catch {
+            lastNotificationDeliveryError = error.localizedDescription
+            return false
+        }
+    }
+
+    func showTestHUD() {
+        alertHUD.show(
+            .preview,
+            displayDuration: Preferences.load().hudDurationSeconds
+        )
     }
 
     // MARK: - Refresh
@@ -211,7 +269,7 @@ final class AppModel: ObservableObject {
                 stateStore.save(state, thresholdPercent: threshold)
             },
             notify: { [weak self] notification in
-                await self?.deliver(notification, now: now, playSound: preferences.alertSoundEnabled)
+                await self?.deliver(notification, now: now, preferences: preferences)
             }
         )
 
@@ -227,7 +285,7 @@ final class AppModel: ObservableObject {
                 stateStore.save(state, step: step)
             },
             notify: { [weak self] notification in
-                await self?.deliver(notification, now: now, playSound: preferences.alertSoundEnabled)
+                await self?.deliver(notification, now: now, preferences: preferences)
             }
         )
     }
@@ -235,28 +293,49 @@ final class AppModel: ObservableObject {
     /// Never throws: the menu-bar indicator below is a delivery channel that
     /// cannot fail, so a denied banner permission must not stop alert state from
     /// advancing (which would re-fire the same alert on every refresh).
-    private func deliver(_ notification: AlertNotification, now: Millis, playSound: Bool) async {
-        recentAlerts[notification.symbol] = RecentAlert(notification: notification, triggeredAt: now)
+    private func deliver(
+        _ notification: AlertNotification,
+        now: Millis,
+        preferences: Preferences
+    ) async {
+        recentAlerts.insert(RecentAlert(notification: notification, triggeredAt: now), at: 0)
+        if recentAlerts.count > maximumRecentAlerts {
+            recentAlerts.removeLast(recentAlerts.count - maximumRecentAlerts)
+        }
 
-        if playSound {
+        if preferences.hudAlertsEnabled {
+            alertHUD.show(
+                notification,
+                displayDuration: preferences.hudDurationSeconds
+            )
+        }
+
+        if preferences.alertSoundEnabled {
             NSSound(named: "Glass")?.play()
         }
 
-        guard Bundle.main.bundleIdentifier != nil else { return }
+        guard preferences.systemNotificationsEnabled,
+              Bundle.main.bundleIdentifier != nil
+        else { return }
+        do {
+            try await enqueueNotification(title: notification.title, body: notification.message)
+            lastNotificationDeliveryError = nil
+        } catch {
+            lastNotificationDeliveryError = error.localizedDescription
+        }
+        await refreshNotificationSettings()
+    }
+
+    private func enqueueNotification(title: String, body: String) async throws {
         let content = UNMutableNotificationContent()
-        content.title = notification.title
-        content.body = notification.message
+        content.title = title
+        content.body = body
         let request = UNNotificationRequest(
             identifier: UUID().uuidString,
             content: content,
             trigger: nil
         )
-        try? await UNUserNotificationCenter.current().add(request)
-    }
-
-    private func requestNotificationAuthorization() {
-        guard Bundle.main.bundleIdentifier != nil else { return }
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        try await notificationCenter.add(request)
     }
 
     // MARK: - Scheduling

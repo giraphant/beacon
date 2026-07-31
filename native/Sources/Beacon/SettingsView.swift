@@ -75,6 +75,7 @@ private enum SettingsPane: String, CaseIterable, Identifiable {
 }
 
 struct SettingsView: View {
+    @ObservedObject private var appModel = AppModel.shared
     @AppStorage(PreferenceKey.coins) private var coins = "BTC ETH NVDA QQQ"
     @AppStorage(PreferenceKey.alertRules) private var alertRules = ""
     @AppStorage(PreferenceKey.integerAlertRules) private var integerAlertRules = ""
@@ -85,6 +86,10 @@ struct SettingsView: View {
     @AppStorage(PreferenceKey.relayUrl) private var relayURL = ""
     @AppStorage(PreferenceKey.refreshSeconds) private var refreshSeconds = 30
     @AppStorage(PreferenceKey.alertSoundEnabled) private var alertSoundEnabled = false
+    @AppStorage(PreferenceKey.hudAlertsEnabled) private var hudAlertsEnabled = true
+    @AppStorage(PreferenceKey.hudDurationSeconds)
+    private var hudDurationSeconds = HUDDuration.defaultSeconds
+    @AppStorage(PreferenceKey.systemNotificationsEnabled) private var systemNotificationsEnabled = false
 
     @State private var relayToken = ""
     @State private var tokenError: String?
@@ -97,6 +102,7 @@ struct SettingsView: View {
     @State private var selectedPane: SettingsPane? = .general
     @State private var symbolRows: [SymbolSettingsEditorRow] = []
     @State private var structuredPreferencesLoaded = false
+    @State private var notificationTestMessage: String?
 
     var body: some View {
         NavigationSplitView {
@@ -112,7 +118,13 @@ struct SettingsView: View {
         }
         .task {
             loadStructuredPreferences()
+            await appModel.refreshNotificationSettings()
             relayToken = await Keychain.read(PreferenceKey.relayToken) ?? ""
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            Task {
+                await appModel.refreshNotificationSettings()
+            }
         }
         .onChange(of: symbolRows) { _, rows in
             guard structuredPreferencesLoaded else { return }
@@ -164,6 +176,77 @@ struct SettingsView: View {
             }
 
             Section("Notifications") {
+                Toggle("Floating HUD", isOn: $hudAlertsEnabled)
+                    .toggleStyle(.switch)
+                    .help("Show a Raycast-style floating alert without using system permissions.")
+
+                if hudAlertsEnabled {
+                    Stepper(
+                        "HUD display time: \(hudDurationDisplayLabel)",
+                        value: $hudDurationSeconds,
+                        in: HUDDuration.range,
+                        step: HUDDuration.step
+                    )
+                    .help("Choose how long each floating alert remains visible.")
+
+                    Button("Preview Floating HUD") {
+                        appModel.showTestHUD()
+                    }
+                }
+
+                Toggle("Notification Center", isOn: $systemNotificationsEnabled)
+                    .toggleStyle(.switch)
+                    .help("Also keep alerts in macOS Notification Center.")
+                    .onChange(of: systemNotificationsEnabled) { _, enabled in
+                        guard enabled else { return }
+                        Task {
+                            await appModel.refreshNotificationSettings(requestIfNeeded: true)
+                        }
+                    }
+
+                if systemNotificationsEnabled {
+                    LabeledContent("System permission", value: appModel.notificationSettings.summary)
+
+                    if let explanation = appModel.notificationSettings.explanation {
+                        Text(explanation)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if appModel.notificationSettings.authorizationStatus == .notDetermined,
+                       appModel.notificationSettings.isLoaded {
+                        Button("Allow Notifications") {
+                            Task {
+                                await appModel.refreshNotificationSettings(requestIfNeeded: true)
+                            }
+                        }
+                    } else if appModel.notificationSettings.needsSystemSettings {
+                        Button("Open Notification Settings") {
+                            openBeaconNotificationSettings()
+                        }
+                    } else if appModel.notificationSettings.canSendTest {
+                        Button("Send Test Notification") {
+                            notificationTestMessage = nil
+                            Task {
+                                let sent = await appModel.sendTestNotification()
+                                notificationTestMessage = sent
+                                    ? "Test notification sent."
+                                    : appModel.lastNotificationDeliveryError
+                            }
+                        }
+                    }
+
+                    if let notificationTestMessage {
+                        Text(notificationTestMessage)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    } else if let error = appModel.lastNotificationDeliveryError {
+                        Text(error)
+                            .font(.callout)
+                            .foregroundStyle(.red)
+                    }
+                }
+
                 Stepper(
                     "Price-level cooldown: \(cooldownDisplayLabel)",
                     value: cooldownBinding,
@@ -269,6 +352,14 @@ struct SettingsView: View {
 
     private var cooldownDisplayLabel: String {
         cooldownDisplay == "Off" ? "Off" : "\(cooldownDisplay) min"
+    }
+
+    private var hudDurationDisplayLabel: String {
+        let value = HUDDuration.normalized(hudDurationSeconds)
+        if value == value.rounded() {
+            return "\(Int(value)) sec"
+        }
+        return String(format: "%.1f sec", value)
     }
 
     /// Convert the Raycast-era strings into rows once when Settings first

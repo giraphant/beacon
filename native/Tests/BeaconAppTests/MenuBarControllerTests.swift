@@ -1,10 +1,26 @@
 import AppKit
+import BeaconCore
 import XCTest
 
 @testable import Beacon
 
 @MainActor
 final class MenuBarControllerTests: XCTestCase {
+    private func alert(
+        _ symbol: String,
+        direction: RecentAlert.Direction,
+        title: String,
+        triggeredAt: Millis
+    ) -> RecentAlert {
+        RecentAlert(
+            symbol: symbol,
+            direction: direction,
+            title: title,
+            message: "$100.00 → $101.00",
+            triggeredAt: triggeredAt
+        )
+    }
+
     func testQuoteLineSplitsIntoSymbolAndPriceColumns() {
         XCTAssertEqual(
             splitQuoteMenuLine("QQQ: $676.85"),
@@ -63,5 +79,75 @@ final class MenuBarControllerTests: XCTestCase {
         XCTAssertEqual(view.intrinsicContentSize, NSSize(width: 200, height: 22))
         XCTAssertEqual(view.textLabel.lineBreakMode, .byTruncatingTail)
         XCTAssertEqual(view.toolTip, text)
+    }
+
+    func testLatestAlertControlsProminentDirection() {
+        let alerts = [
+            alert("BTC", direction: .up, title: "BTC rose 1.00%", triggeredAt: 20_000),
+            alert("QQQ", direction: .down, title: "QQQ fell 1.00%", triggeredAt: 10_000),
+        ]
+
+        XCTAssertEqual(prominentAlertDirection(in: alerts), .up)
+        XCTAssertEqual(latestAlert(for: "QQQ", in: alerts)?.direction, .down)
+    }
+
+    func testRecentAlertRowExplainsWhatTriggered() {
+        let value = alert(
+            "QQQ",
+            direction: .up,
+            title: "QQQ crossed above $670.00",
+            triggeredAt: 10_000
+        )
+        let view = RecentAlertMenuRowView(alert: value, now: 22_000)
+
+        XCTAssertEqual(view.titleLabel.stringValue, "QQQ")
+        XCTAssertTrue(view.percentageLabel.isHidden)
+        XCTAssertEqual(view.messageLabel.stringValue, "$100.00 → $101.00")
+        XCTAssertEqual(view.ageLabel.stringValue, "12s ago")
+        XCTAssertEqual(view.intrinsicContentSize.width, QuoteMenuRowView.rowSize.width)
+        XCTAssertEqual(view.intrinsicContentSize.height, 42)
+        XCTAssertEqual(view.toolTip, "QQQ crossed above $670.00\n$100.00 → $101.00")
+    }
+
+    func testRecentAlertRowRemovesRedundantMovementAndStepDetails() {
+        let value = RecentAlert(
+            symbol: "NVDA",
+            direction: .up,
+            title: "NVDA rose 1.01%",
+            message: "$193.68 → $195.63, crossed 1 × 1.00% steps",
+            triggeredAt: 10_000
+        )
+        let view = RecentAlertMenuRowView(alert: value, now: 22_000)
+
+        XCTAssertEqual(view.titleLabel.stringValue, "NVDA")
+        XCTAssertEqual(view.percentageLabel.stringValue, "(+1.01%)")
+        XCTAssertFalse(view.percentageLabel.isHidden)
+        XCTAssertEqual(view.detailStackView.spacing, 5)
+        XCTAssertLessThan(
+            view.percentageLabel.font!.pointSize,
+            view.messageLabel.font!.pointSize
+        )
+        XCTAssertEqual(view.messageLabel.stringValue, "$193.68 → $195.63")
+        XCTAssertEqual(
+            view.toolTip,
+            "NVDA rose 1.01%\n$193.68 → $195.63, crossed 1 × 1.00% steps"
+        )
+    }
+
+    func testRecentAlertRowShowsSignedPercentageAfterThePriceChange() {
+        let value = RecentAlert(
+            symbol: "HOOD",
+            direction: .down,
+            title: "HOOD fell 2.80%",
+            message: "$90.780 → $88.240, crossed 1 × 2.00% steps",
+            triggeredAt: 10_000
+        )
+
+        let view = RecentAlertMenuRowView(alert: value, now: 22_000)
+
+        XCTAssertEqual(view.titleLabel.stringValue, "HOOD")
+        XCTAssertEqual(view.messageLabel.stringValue, "$90.780 → $88.240")
+        XCTAssertEqual(view.percentageLabel.stringValue, "(−2.80%)")
+        XCTAssertNotNil(view.directionImageView.image)
     }
 }
