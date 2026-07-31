@@ -12,6 +12,20 @@ enum PreferenceKey {
     static let relayUrl = "relayUrl"
     static let refreshSeconds = "refreshSeconds"
     static let alertSoundEnabled = "alertSoundEnabled"
+    static let hudAlertsEnabled = "hudAlertsEnabled"
+    static let hudDurationSeconds = "hudDurationSeconds"
+    static let systemNotificationsEnabled = "systemNotificationsEnabled"
+}
+
+enum HUDDuration {
+    static let defaultSeconds = 3.0
+    static let range = 1.0...10.0
+    static let step = 0.5
+
+    static func normalized(_ value: Double) -> Double {
+        guard value.isFinite else { return defaultSeconds }
+        return min(range.upperBound, max(range.lowerBound, value))
+    }
 }
 
 struct Preferences: Equatable {
@@ -25,12 +39,18 @@ struct Preferences: Equatable {
     var relayURL: String
     var refreshSeconds: Double
     var alertSoundEnabled: Bool
+    var hudAlertsEnabled: Bool
+    var hudDurationSeconds: Double
+    var systemNotificationsEnabled: Bool
 
     static let defaults: [String: Any] = [
         PreferenceKey.coins: "BTC ETH NVDA QQQ",
         PreferenceKey.integerAlertCooldownMinutes: "10",
         PreferenceKey.source: QuoteSourceKind.bybit.rawValue,
         PreferenceKey.refreshSeconds: 30,
+        PreferenceKey.hudAlertsEnabled: true,
+        PreferenceKey.hudDurationSeconds: HUDDuration.defaultSeconds,
+        PreferenceKey.systemNotificationsEnabled: false,
     ]
 
     static func load(_ store: UserDefaults = .standard) -> Preferences {
@@ -45,7 +65,13 @@ struct Preferences: Equatable {
             relayURL: store.string(forKey: PreferenceKey.relayUrl) ?? "",
             // Clamped so a stray 0 in defaults cannot turn the timer into a spin loop.
             refreshSeconds: max(5, store.double(forKey: PreferenceKey.refreshSeconds)),
-            alertSoundEnabled: store.bool(forKey: PreferenceKey.alertSoundEnabled)
+            alertSoundEnabled: store.bool(forKey: PreferenceKey.alertSoundEnabled),
+            hudAlertsEnabled: store.bool(forKey: PreferenceKey.hudAlertsEnabled),
+            hudDurationSeconds: HUDDuration.normalized(
+                (store.object(forKey: PreferenceKey.hudDurationSeconds) as? NSNumber)?.doubleValue
+                    ?? HUDDuration.defaultSeconds
+            ),
+            systemNotificationsEnabled: store.bool(forKey: PreferenceKey.systemNotificationsEnabled)
         )
     }
 }

@@ -9,6 +9,7 @@ DIST_DIR    := $(BUILD_DIR)/dist
 DIST_APP    := $(DIST_DIR)/$(APP_NAME).app
 DIST_DMG    := $(DIST_DIR)/$(APP_NAME).dmg
 DMG_STAGING := $(BUILD_DIR)/dmg-staging
+ICON_SOURCE := Resources/command-icon-v2.png
 
 # Homebrew tap that ships the cask. `make release` bumps the cask here so
 # users can `brew upgrade --cask beacon`.
@@ -45,8 +46,8 @@ build:
 	@# The icon only shows on notification banners — LSUIElement means no Dock
 	@# tile. Built from the source PNG to keep .icns out of git.
 	@iconset=$$(mktemp -d)/AppIcon.iconset; mkdir -p "$$iconset"; \
-	sips -z 512 512 Resources/command-icon.png --out "$$iconset/icon_512x512.png" >/dev/null; \
-	sips -z 1024 1024 Resources/command-icon.png --out "$$iconset/icon_512x512@2x.png" >/dev/null; \
+	sips -z 512 512 $(ICON_SOURCE) --out "$$iconset/icon_512x512.png" >/dev/null; \
+	sips -z 1024 1024 $(ICON_SOURCE) --out "$$iconset/icon_512x512@2x.png" >/dev/null; \
 	iconutil -c icns "$$iconset" -o $(APP_BUNDLE)/Contents/Resources/AppIcon.icns
 	@if security find-identity -v -p codesigning | grep -F "$(CODESIGN_IDENTITY)" >/dev/null 2>&1; then \
 		codesign --force $(CODESIGN_OPTIONS) --sign "$(CODESIGN_IDENTITY)" $(APP_BUNDLE); \

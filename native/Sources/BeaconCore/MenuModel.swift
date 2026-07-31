@@ -9,12 +9,28 @@ public struct RecentAlert: Equatable, Codable, Sendable {
     public var message: String
     public var triggeredAt: Millis
 
-    public init(notification: AlertNotification, triggeredAt: Millis) {
-        self.symbol = notification.symbol
-        self.direction = notification.movementPercent > 0 ? .up : .down
-        self.title = notification.title
-        self.message = notification.message
+    public init(
+        symbol: String,
+        direction: Direction,
+        title: String,
+        message: String,
+        triggeredAt: Millis
+    ) {
+        self.symbol = symbol
+        self.direction = direction
+        self.title = title
+        self.message = message
         self.triggeredAt = triggeredAt
+    }
+
+    public init(notification: AlertNotification, triggeredAt: Millis) {
+        self.init(
+            symbol: notification.symbol,
+            direction: notification.movementPercent > 0 ? .up : .down,
+            title: notification.title,
+            message: notification.message,
+            triggeredAt: triggeredAt
+        )
     }
 }
 
